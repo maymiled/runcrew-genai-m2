@@ -1,37 +1,41 @@
-# RunCrew — Generative AI M2 (Dauphine) — Groupe Mayy / Giuliano
+# RunCrew — GenAI M2 Hackathon
 
-Repo de groupe pour le module Generative AI (M2 IASD, 2026). Contient :
+Application mobile de coaching pour clubs de running, construite avec React Native / Expo et un agent IA basé sur Claude Haiku.
 
-- `notebooks/` — les 5 TD du cours (TD1 embeddings → TD5 agent), à compléter.
-- `projet/` — le projet hackathon (Track 1) : **RunCrew Coach IA**, un agent qui
-  génère et ajuste les séances d'entraînement pour les clubs de running RunCrew.
-  - `projet/app/` — l'app mobile RunCrew (React Native/Expo + Supabase), avec l'écran
-    "Coach IA" intégré (bouton sur la page crew → brief → aperçu → publication).
-  - `projet/runcrew-coach-ia/` — le backend de l'agent (Flask + MCP + RAG + boucle
-    Haiku). Voir `projet/runcrew-coach-ia/README.md` pour le run.
+## Architecture
 
-## RunCrew — contexte produit
-
-RunCrew est une app mobile (React Native/Expo + Supabase) qui aide les clubs de
-running à organiser leurs séances. L'app mobile (`projet/app/`) et le backend agent
-(`projet/runcrew-coach-ia/`) parlent au même projet Supabase ; le backend appelle
-l'API REST de Supabase en forwardant le token du capitaine connecté (les RLS
-s'appliquent normalement, pas de clé service-role nécessaire).
-
-## Setup
-
-```bash
-pip install -r requirements.txt
-cp .env.example .env   # remplir ANTHROPIC_API_KEY (voir resources/setup_guide.md côté cours)
+```
+runcrew/          ← App mobile (React Native + Expo + Supabase)
+runcrew-coach-backend/  ← Agent coach (Flask + Claude Haiku + MCP + RAG)
+notebooks/        ← TDs complétés (TD1 → TD5)
+projet/           ← Sujet hackathon
 ```
 
-## Statut
+## Stack technique
 
-- [x] TD1 – Embeddings
-- [x] TD2 – Classification
-- [x] TD3 – RAG (+ mini-projet)
-- [x] TD4 – MCP (+ mini-projet)
-- [x] TD5 – Agent (+ mini-projet)
-- [x] Projet hackathon — Coach IA (MVP construit : lecture allures crew, RAG coaching,
-      génération + publication de séance avec validation humaine ; à tester avec une
-      vraie clé Anthropic avant la démo — voir `projet/runcrew-coach-ia/README.md`)
+- **Frontend** : React Native, Expo SDK 54, TypeScript, Expo Router v5, Zustand
+- **Backend** : Supabase (PostgreSQL, Auth, Realtime, Storage)
+- **Agent** : Claude Haiku 4.5, MCP (FastMCP), RAG (ChromaDB + sentence-transformers)
+- **Modèle** : `claude-haiku-4-5`
+
+## Agent Kipper — Coach IA
+
+L'agent génère des plans de séance personnalisés en :
+1. Fetchant les allures réelles du crew via MCP (`get_membres_allures`)
+2. Recherchant les connaissances coaching via RAG (`search_coaching_knowledge`)
+3. Adaptant le plan à la météo (`get_meteo_prevision`)
+4. Validant la contrainte de durée par itération (boucle `reason → act → observe`)
+
+## Lancer le projet
+
+```bash
+# App mobile
+cd runcrew && npx expo start --tunnel
+
+# Backend agent
+cd runcrew-coach-backend && python app.py
+```
+
+## Variables d'environnement
+
+Voir `.env.example` à la racine.

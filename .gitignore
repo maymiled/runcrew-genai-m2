@@ -11,9 +11,12 @@ venv/
 genai_env/
 *.egg-info/
 
-# Node / Expo (if the mobile app is ever added here)
+# Node / Expo
 node_modules/
 .expo/
+dist/
+web-build/
+expo-env.d.ts
 
 # Data artifacts (regenerable)
 **/chroma_db/
@@ -26,3 +29,7 @@ node_modules/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# iOS / Android builds
+ios/
+android/

@@ -14,23 +14,33 @@ import {
 import { COULEURS } from '../../src/lib/constantes';
 import { useAuthStore } from '../../src/stores/useAuthStore';
 
-export default function Connexion() {
+export default function Inscription() {
+  const [nom, setNom] = useState('');
   const [email, setEmail] = useState('');
   const [motDePasse, setMotDePasse] = useState('');
   const [chargement, setChargement] = useState(false);
-  const seConnecter = useAuthStore((s) => s.seConnecter);
+  const sInscrire = useAuthStore((s) => s.sInscrire);
 
-  const handleConnexion = async () => {
-    if (!email || !motDePasse) {
+  const handleInscription = async () => {
+    if (!nom || !email || !motDePasse) {
       Alert.alert('Erreur', 'Remplis tous les champs');
+      return;
+    }
+
+    if (motDePasse.length < 6) {
+      Alert.alert('Erreur', 'Le mot de passe doit faire au moins 6 caractères');
       return;
     }
 
     setChargement(true);
     try {
-      await seConnecter(email.trim().toLowerCase(), motDePasse);
+      await sInscrire(email.trim().toLowerCase(), motDePasse, nom.trim());
+      Alert.alert(
+        'Inscription réussie',
+        'Vérifie ta boîte mail pour confirmer ton compte, puis connecte-toi.'
+      );
     } catch (error: any) {
-      Alert.alert('Erreur de connexion', error.message || 'Une erreur est survenue');
+      Alert.alert('Erreur', error.message || 'Une erreur est survenue');
     } finally {
       setChargement(false);
     }
@@ -48,7 +58,19 @@ export default function Connexion() {
         </View>
 
         <View style={styles.formulaire}>
-          <Text style={styles.titre}>Connexion</Text>
+          <Text style={styles.titre}>Inscription</Text>
+
+          <View style={styles.champContainer}>
+            <Text style={styles.label}>Prénom ou pseudo</Text>
+            <TextInput
+              style={styles.champ}
+              value={nom}
+              onChangeText={setNom}
+              placeholder="Ex: Giuliano"
+              placeholderTextColor={COULEURS.night[300]}
+              autoCapitalize="words"
+            />
+          </View>
 
           <View style={styles.champContainer}>
             <Text style={styles.label}>Email</Text>
@@ -70,7 +92,7 @@ export default function Connexion() {
               style={styles.champ}
               value={motDePasse}
               onChangeText={setMotDePasse}
-              placeholder="••••••••"
+              placeholder="6 caractères minimum"
               placeholderTextColor={COULEURS.night[300]}
               secureTextEntry
             />
@@ -78,21 +100,21 @@ export default function Connexion() {
 
           <TouchableOpacity
             style={[styles.bouton, chargement && styles.boutonDesactive]}
-            onPress={handleConnexion}
+            onPress={handleInscription}
             disabled={chargement}
           >
             {chargement ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.boutonTexte}>Se connecter</Text>
+              <Text style={styles.boutonTexte}>Créer mon compte</Text>
             )}
           </TouchableOpacity>
 
           <View style={styles.footer}>
-            <Text style={styles.footerTexte}>Pas encore de compte ? </Text>
-            <Link href="/(auth)/inscription" asChild>
+            <Text style={styles.footerTexte}>Déjà un compte ? </Text>
+            <Link href="/(auth)/connexion" asChild>
               <TouchableOpacity>
-                <Text style={styles.footerLien}>S'inscrire</Text>
+                <Text style={styles.footerLien}>Se connecter</Text>
               </TouchableOpacity>
             </Link>
           </View>

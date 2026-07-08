@@ -1,0 +1,18 @@
+# API / backend
+fastapi
+uvicorn[standard]
+python-dotenv
+httpx
+
+# LLM
+anthropic
+
+# MCP
+mcp
+
+# Supabase
+supabase
+
+# RAG
+sentence-transformers
+chromadb

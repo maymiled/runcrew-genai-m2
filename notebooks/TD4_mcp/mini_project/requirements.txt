@@ -1,0 +1,4 @@
+mcp
+chromadb
+sentence-transformers
+pandas

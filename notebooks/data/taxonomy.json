@@ -1,0 +1,273 @@
+{
+  "common_attributes": [
+    { "name": "name", "type": "text", "description": "Product name" },
+    { "name": "brand", "type": "text", "description": "Brand / manufacturer" },
+    { "name": "category", "type": "text", "description": "Leaf category from this taxonomy" },
+    { "name": "price", "type": "number", "unit": "EUR", "description": "Retail price" },
+    { "name": "short_description", "type": "text", "description": "One-line tagline" },
+    { "name": "long_description", "type": "text", "description": "2-4 sentence catalog description" }
+  ],
+  "categories": [
+    {
+      "name": "Audio",
+      "subcategories": [
+        {
+          "name": "Headphones",
+          "category_attributes": [
+            { "name": "color", "type": "text" },
+            { "name": "connectivity", "type": "enum", "values": ["Wired", "Bluetooth", "Wired + Bluetooth"] },
+            { "name": "noise_cancellation", "type": "enum", "values": ["Yes", "No"] },
+            { "name": "battery_life_hours", "type": "number", "unit": "hours" },
+            { "name": "weight_g", "type": "number", "unit": "g" }
+          ]
+        },
+        {
+          "name": "Wireless Earbuds",
+          "category_attributes": [
+            { "name": "color", "type": "text" },
+            { "name": "noise_cancellation", "type": "enum", "values": ["Yes", "No"] },
+            { "name": "battery_life_hours", "type": "number", "unit": "hours" },
+            { "name": "water_resistance", "type": "enum", "values": ["None", "IPX4", "IPX5", "IPX7", "IP67"] },
+            { "name": "case_charging", "type": "enum", "values": ["USB-C", "Wireless", "USB-C + Wireless"] }
+          ]
+        },
+        {
+          "name": "Bluetooth Speakers",
+          "category_attributes": [
+            { "name": "color", "type": "text" },
+            { "name": "power_output_w", "type": "number", "unit": "W" },
+            { "name": "battery_life_hours", "type": "number", "unit": "hours" },
+            { "name": "water_resistance", "type": "enum", "values": ["None", "IPX4", "IPX7", "IP67"] },
+            { "name": "weight_g", "type": "number", "unit": "g" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Computing",
+      "subcategories": [
+        {
+          "name": "Laptops",
+          "category_attributes": [
+            { "name": "color", "type": "text" },
+            { "name": "screen_size_in", "type": "number", "unit": "in" },
+            { "name": "ram_gb", "type": "number", "unit": "GB" },
+            { "name": "storage_gb", "type": "number", "unit": "GB" },
+            { "name": "processor", "type": "text" },
+            { "name": "operating_system", "type": "enum", "values": ["Windows 11", "macOS", "ChromeOS", "Linux"] }
+          ]
+        },
+        {
+          "name": "Tablets",
+          "category_attributes": [
+            { "name": "color", "type": "text" },
+            { "name": "screen_size_in", "type": "number", "unit": "in" },
+            { "name": "storage_gb", "type": "number", "unit": "GB" },
+            { "name": "connectivity", "type": "enum", "values": ["Wi-Fi", "Wi-Fi + Cellular"] },
+            { "name": "operating_system", "type": "enum", "values": ["iPadOS", "Android", "Windows 11"] }
+          ]
+        },
+        {
+          "name": "Monitors",
+          "category_attributes": [
+            { "name": "screen_size_in", "type": "number", "unit": "in" },
+            { "name": "resolution", "type": "enum", "values": ["1920x1080", "2560x1440", "3840x2160", "5120x1440"] },
+            { "name": "refresh_rate_hz", "type": "number", "unit": "Hz" },
+            { "name": "panel_type", "type": "enum", "values": ["IPS", "VA", "OLED", "TN"] },
+            { "name": "ports", "type": "text" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mobile & Wearables",
+      "subcategories": [
+        {
+          "name": "Smartphones",
+          "category_attributes": [
+            { "name": "color", "type": "text" },
+            { "name": "screen_size_in", "type": "number", "unit": "in" },
+            { "name": "storage_gb", "type": "number", "unit": "GB" },
+            { "name": "ram_gb", "type": "number", "unit": "GB" },
+            { "name": "operating_system", "type": "enum", "values": ["Android", "iOS"] },
+            { "name": "camera_mp", "type": "number", "unit": "MP" }
+          ]
+        },
+        {
+          "name": "Smartwatches",
+          "category_attributes": [
+            { "name": "color", "type": "text" },
+            { "name": "case_size_mm", "type": "number", "unit": "mm" },
+            { "name": "connectivity", "type": "enum", "values": ["GPS", "GPS + Cellular"] },
+            { "name": "battery_life_hours", "type": "number", "unit": "hours" },
+            { "name": "compatibility", "type": "enum", "values": ["iOS", "Android", "Both"] }
+          ]
+        },
+        {
+          "name": "Fitness Trackers",
+          "category_attributes": [
+            { "name": "color", "type": "text" },
+            { "name": "battery_life_days", "type": "number", "unit": "days" },
+            { "name": "water_resistance", "type": "enum", "values": ["None", "5ATM", "IP68"] },
+            { "name": "heart_rate", "type": "enum", "values": ["Yes", "No"] },
+            { "name": "gps", "type": "enum", "values": ["Yes", "No"] }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TV & Photo",
+      "subcategories": [
+        {
+          "name": "Televisions",
+          "category_attributes": [
+            { "name": "screen_size_in", "type": "number", "unit": "in" },
+            { "name": "resolution", "type": "enum", "values": ["HD", "Full HD", "4K UHD", "8K UHD"] },
+            { "name": "panel_type", "type": "enum", "values": ["OLED", "QLED", "LED", "Mini-LED"] },
+            { "name": "refresh_rate_hz", "type": "number", "unit": "Hz" },
+            { "name": "smart_os", "type": "text" }
+          ]
+        },
+        {
+          "name": "Cameras",
+          "category_attributes": [
+            { "name": "type", "type": "enum", "values": ["DSLR", "Mirrorless", "Compact", "Action"] },
+            { "name": "sensor", "type": "enum", "values": ["Full-frame", "APS-C", "Micro 4/3", "1-inch"] },
+            { "name": "resolution_mp", "type": "number", "unit": "MP" },
+            { "name": "lens_mount", "type": "text" },
+            { "name": "video_resolution", "type": "enum", "values": ["1080p", "4K", "6K", "8K"] }
+          ]
+        },
+        {
+          "name": "Drones",
+          "category_attributes": [
+            { "name": "max_flight_time_min", "type": "number", "unit": "min" },
+            { "name": "camera_resolution", "type": "enum", "values": ["1080p", "4K", "5.4K", "8K"] },
+            { "name": "max_range_km", "type": "number", "unit": "km" },
+            { "name": "weight_g", "type": "number", "unit": "g" },
+            { "name": "gps", "type": "enum", "values": ["Yes", "No"] }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Gaming",
+      "subcategories": [
+        {
+          "name": "Consoles",
+          "category_attributes": [
+            { "name": "platform", "type": "text" },
+            { "name": "storage_gb", "type": "number", "unit": "GB" },
+            { "name": "edition", "type": "enum", "values": ["Standard", "Digital", "Bundle"] },
+            { "name": "color", "type": "text" },
+            { "name": "generation", "type": "text" }
+          ]
+        },
+        {
+          "name": "Video Games",
+          "category_attributes": [
+            { "name": "platform", "type": "text" },
+            { "name": "genre", "type": "enum", "values": ["Action", "Action RPG", "Adventure", "FPS", "Sports", "Racing", "Strategy", "Simulation", "Platformer"] },
+            { "name": "pegi_rating", "type": "enum", "values": ["3", "7", "12", "16", "18"] },
+            { "name": "edition", "type": "enum", "values": ["Standard", "Deluxe", "Collector"] },
+            { "name": "release_year", "type": "number", "unit": "year" }
+          ]
+        },
+        {
+          "name": "Controllers",
+          "category_attributes": [
+            { "name": "platform_compatibility", "type": "text" },
+            { "name": "connectivity", "type": "enum", "values": ["Wired", "Wireless", "Wired + Wireless"] },
+            { "name": "color", "type": "text" },
+            { "name": "battery_life_hours", "type": "number", "unit": "hours" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Home & Kitchen",
+      "subcategories": [
+        {
+          "name": "Coffee Machines",
+          "category_attributes": [
+            { "name": "type", "type": "enum", "values": ["Espresso", "Bean-to-cup", "Filter", "Capsule", "Manual"] },
+            { "name": "pressure_bar", "type": "number", "unit": "bar" },
+            { "name": "capacity_l", "type": "number", "unit": "L" },
+            { "name": "color", "type": "text" },
+            { "name": "milk_frother", "type": "enum", "values": ["Yes", "No"] }
+          ]
+        },
+        {
+          "name": "Vacuum Cleaners",
+          "category_attributes": [
+            { "name": "type", "type": "enum", "values": ["Robot", "Upright", "Stick", "Canister", "Handheld"] },
+            { "name": "power_w", "type": "number", "unit": "W" },
+            { "name": "battery_life_min", "type": "number", "unit": "min" },
+            { "name": "dust_capacity_l", "type": "number", "unit": "L" },
+            { "name": "bagless", "type": "enum", "values": ["Yes", "No"] }
+          ]
+        },
+        {
+          "name": "Cookware Sets",
+          "category_attributes": [
+            { "name": "material", "type": "enum", "values": ["Non-stick", "Stainless steel", "Cast iron", "Ceramic"] },
+            { "name": "pieces", "type": "number" },
+            { "name": "induction_compatible", "type": "enum", "values": ["Yes", "No"] },
+            { "name": "dishwasher_safe", "type": "enum", "values": ["Yes", "No"] },
+            { "name": "color", "type": "text" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Books & Music",
+      "subcategories": [
+        {
+          "name": "Books",
+          "category_attributes": [
+            { "name": "author", "type": "text" },
+            { "name": "genre", "type": "enum", "values": ["Fiction", "Non-fiction", "Self-help", "Science Fiction", "Fantasy", "Historical Fiction", "Biography", "Children", "Thriller"] },
+            { "name": "format", "type": "enum", "values": ["Hardcover", "Paperback", "eBook", "Audiobook"] },
+            { "name": "pages", "type": "number" },
+            { "name": "language", "type": "enum", "values": ["English", "French", "Spanish", "German"] }
+          ]
+        },
+        {
+          "name": "Vinyl Records",
+          "category_attributes": [
+            { "name": "artist", "type": "text" },
+            { "name": "genre", "type": "enum", "values": ["Rock", "Pop", "Jazz", "Soul", "Hip-Hop", "Electronic", "Classical", "Folk"] },
+            { "name": "format", "type": "enum", "values": ["LP", "EP", "Double LP"] },
+            { "name": "release_year", "type": "number", "unit": "year" },
+            { "name": "rpm", "type": "enum", "values": ["33", "45"] }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Beauty & Wellness",
+      "subcategories": [
+        {
+          "name": "Hair Dryers",
+          "category_attributes": [
+            { "name": "power_w", "type": "number", "unit": "W" },
+            { "name": "color", "type": "text" },
+            { "name": "ionic", "type": "enum", "values": ["Yes", "No"] },
+            { "name": "attachments", "type": "text" },
+            { "name": "weight_g", "type": "number", "unit": "g" }
+          ]
+        },
+        {
+          "name": "Electric Toothbrushes",
+          "category_attributes": [
+            { "name": "color", "type": "text" },
+            { "name": "brushing_modes", "type": "number" },
+            { "name": "battery_life_days", "type": "number", "unit": "days" },
+            { "name": "connectivity", "type": "enum", "values": ["None", "Bluetooth"] },
+            { "name": "pressure_sensor", "type": "enum", "values": ["Yes", "No"] }
+          ]
+        }
+      ]
+    }
+  ]
+}

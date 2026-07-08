@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Catalog Chatbot</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.3rem; }
+    #chat { border: 1px solid #ddd; border-radius: 8px; padding: 16px; min-height: 300px; margin-bottom: 12px; }
+    .msg { margin-bottom: 14px; }
+    .msg .role { font-weight: 600; font-size: 0.8rem; color: #666; }
+    .msg .text { white-space: pre-wrap; }
+    .products { font-size: 0.85rem; color: #444; margin-top: 4px; }
+    form { display: flex; gap: 8px; }
+    input { flex: 1; padding: 8px; font-size: 1rem; }
+    button { padding: 8px 16px; font-size: 1rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🛒 Catalog assistant</h1>
+  <p>Ask a question about the product catalog (e.g. "do you have noise-cancelling headphones under 200 euros?").</p>
+  <div id="chat"></div>
+  <form id="form">
+    <input id="question" type="text" placeholder="Ask a question…" autocomplete="off" required>
+    <button type="submit">Send</button>
+  </form>
+
+  <script>
+    const chat = document.getElementById("chat");
+    const form = document.getElementById("form");
+    const input = document.getElementById("question");
+
+    function addMessage(role, text, products) {
+      const div = document.createElement("div");
+      div.className = "msg";
+      let html = `<div class="role">${role}</div><div class="text"></div>`;
+      div.innerHTML = html;
+      div.querySelector(".text").textContent = text;
+      if (products && products.length) {
+        const p = document.createElement("div");
+        p.className = "products";
+        p.textContent = "Matched: " + products.map(x => `${x.name} (${x.category}, ${x.price}€)`).join(", ");
+        div.appendChild(p);
+      }
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const question = input.value.trim();
+      if (!question) return;
+      addMessage("you", question);
+      input.value = "";
+      addMessage("assistant", "…");
+      const loadingMsg = chat.lastElementChild;
+
+      try {
+        const res = await fetch("/api/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question }),
+        });
+        const data = await res.json();
+        loadingMsg.remove();
+        if (data.error) {
+          addMessage("assistant", "Error: " + data.error);
+        } else {
+          addMessage("assistant", data.answer, data.products);
+        }
+      } catch (err) {
+        loadingMsg.remove();
+        addMessage("assistant", "Request failed: " + err);
+      }
+    });
+  </script>
+</body>
+</html>

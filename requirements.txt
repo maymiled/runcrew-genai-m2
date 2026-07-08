@@ -1,0 +1,27 @@
+# Core
+pandas
+numpy
+
+# LLM / API
+anthropic
+python-dotenv
+
+# Embeddings & RAG
+sentence-transformers
+chromadb
+
+# Lab 2 — classic ML classification
+scikit-learn
+
+# Visualization (embeddings, Lab 1)
+matplotlib
+
+# Lab 4 — Model Context Protocol
+mcp
+
+# Notebooks
+jupyter
+ipykernel
+
+# Hackathon project (optional, per group)
+flask

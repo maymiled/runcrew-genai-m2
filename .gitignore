@@ -17,6 +17,7 @@ node_modules/
 
 # Data artifacts (regenerable)
 **/chroma_db/
+**/chroma_index/
 
 # OS / editor
 .DS_Store

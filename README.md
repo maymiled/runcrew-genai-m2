@@ -14,11 +14,18 @@ running à organiser leurs séances. Le code de l'app mobile vit dans un repo s�
 (propriété de Giuliano) ; ce repo ne contient que l'agent Coach IA, qui est un
 service autonome parlant au même projet Supabase.
 
+## Setup
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env   # remplir ANTHROPIC_API_KEY (voir resources/setup_guide.md côté cours)
+```
+
 ## Statut
 
-- [ ] TD1 – Embeddings
-- [ ] TD2 – Classification
-- [ ] TD3 – RAG (+ mini-projet)
-- [ ] TD4 – MCP (+ mini-projet)
-- [ ] TD5 – Agent (+ mini-projet)
+- [x] TD1 – Embeddings
+- [x] TD2 – Classification
+- [x] TD3 – RAG (+ mini-projet)
+- [x] TD4 – MCP (+ mini-projet)
+- [ ] TD5 – Agent (+ mini-projet) — en cours
 - [ ] Projet hackathon — Coach IA

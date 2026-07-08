@@ -1,0 +1,19 @@
+# Coach IA backend — RunCrew hackathon
+
+# LLM / API
+anthropic
+python-dotenv
+
+# Web
+flask
+flask-cors
+
+# MCP (agent tools)
+mcp
+
+# Supabase REST calls
+requests
+
+# RAG
+sentence-transformers
+chromadb

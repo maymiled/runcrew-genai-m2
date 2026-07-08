@@ -1,0 +1,27 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+genai_env/
+*.egg-info/
+
+# Node / Expo (if the mobile app is ever added here)
+node_modules/
+.expo/
+
+# Data artifacts (regenerable)
+**/chroma_db/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/

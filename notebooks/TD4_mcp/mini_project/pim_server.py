@@ -40,8 +40,9 @@ mcp_server = FastMCP("pim")
 
 def _hit_from(sku, metadata):
     hit = {"sku": sku, **metadata}
-    if isinstance(hit.get("attributes"), str):
-        hit["attributes"] = json.loads(hit["attributes"])
+    for field in ("attributes", "extra"):   # stored as JSON strings -> parse back to dicts
+        if isinstance(hit.get(field), str):
+            hit[field] = json.loads(hit[field])
     return hit
 
 
@@ -102,10 +103,13 @@ def create_product(
     short_description: str,
     long_description: str,
     attributes: dict,
+    extra: dict | None = None,
 ) -> dict:
     """Create a new product in the catalog: embeds it with the same MiniLM model used
     everywhere else and adds it to ChromaDB, so it is immediately searchable via
-    search_products (no reindexing needed). Returns the created product's sku and name.
+    search_products (no reindexing needed). `attributes` is the full category-attribute
+    dict (all keys, null where unknown); `extra` is a catch-all for supplier info that
+    fits no catalog field. Returns the created product's sku and name.
     """
     doc = f"{name} — {long_description}"
     embedding = embed_model.encode(doc).tolist()
@@ -122,6 +126,7 @@ def create_product(
                 "short_description": short_description,
                 "long_description": long_description,
                 "attributes": json.dumps(attributes),
+                "extra": json.dumps(extra or {}),
             }
         ],
     )

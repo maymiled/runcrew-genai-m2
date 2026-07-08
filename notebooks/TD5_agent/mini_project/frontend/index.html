@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PIM Copilot</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.3rem; }
+    p.hint { color: #555; }
+    #chat { border: 1px solid #ddd; border-radius: 8px; padding: 16px; min-height: 320px; margin-bottom: 12px; }
+    .msg { margin-bottom: 16px; }
+    .msg .role { font-weight: 600; font-size: 0.8rem; color: #666; }
+    .msg .text { white-space: pre-wrap; }
+    .trace { margin-top: 6px; padding: 8px 10px; background: #f5f5f7; border-radius: 6px;
+             font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem;
+             color: #444; line-height: 1.6; }
+    .trace .step { color: #7c3aed; }
+    form { display: flex; gap: 8px; }
+    textarea { flex: 1; padding: 8px; font-size: 1rem; font-family: inherit; resize: vertical; min-height: 44px; }
+    button { padding: 8px 16px; font-size: 1rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🤖 PIM Copilot</h1>
+  <p class="hint">Ask about the catalog ("do we have ANC headphones under €300?"), or paste a
+     messy supplier blurb to add a new product — watch the agent reason, act, and observe below.</p>
+  <div id="chat"></div>
+  <form id="form">
+    <textarea id="message" placeholder="Ask a question or paste a supplier blurb…" required></textarea>
+    <button type="submit">Send</button>
+  </form>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

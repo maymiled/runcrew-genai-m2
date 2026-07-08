@@ -31,7 +31,7 @@ cp .env.example .env   # remplir ANTHROPIC_API_KEY (voir resources/setup_guide.m
 - [x] TD2 – Classification
 - [x] TD3 – RAG (+ mini-projet)
 - [x] TD4 – MCP (+ mini-projet)
-- [ ] TD5 – Agent (+ mini-projet) — en cours
+- [x] TD5 – Agent (+ mini-projet)
 - [x] Projet hackathon — Coach IA (MVP construit : lecture allures crew, RAG coaching,
       génération + publication de séance avec validation humaine ; à tester avec une
       vraie clé Anthropic avant la démo — voir `projet/runcrew-coach-ia/README.md`)

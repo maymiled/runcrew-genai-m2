@@ -33,6 +33,7 @@ def main():
             "short_description": r["short_description"],
             "long_description": r["long_description"],
             "attributes": r["attributes"],  # JSON string -> Chroma metadata must be scalar
+            "extra": "{}",  # existing catalog products have no supplier leftovers
         }
         for _, r in df.iterrows()
     ]

@@ -1,7 +1,11 @@
 from mcp.server.fastmcp import FastMCP
 
 from mcp_server.rag import search as rag_search
-from mcp_server.supabase_client import fetch_membres_with_profils, parse_numrange
+from mcp_server.supabase_client import (
+    fetch_membres_with_profils,
+    parse_numrange,
+    secondes_vers_allure_decimale,
+)
 from mcp_server.weather import get_weather
 
 mcp_server = FastMCP("coach")
@@ -9,10 +13,12 @@ mcp_server = FastMCP("coach")
 
 @mcp_server.tool()
 def get_membres_allures(crew_id: str) -> list:
-    """Return each crew member's display name and pace range (min/km) as a
-    list of {nom_affichage, allure_basse, allure_haute}. Members who have not
-    set a pace are omitted. Call this before designing pace groups so groups
-    reflect the crew's real members instead of generic assumptions."""
+    """Return each crew member's display name and pace range as a list of
+    {nom_affichage, allure_basse, allure_haute}. Paces use the packed MM.SS
+    decimal convention (e.g. 5.30 means 5min30s/km) — the same convention you
+    must use for the groupes you produce in finaliser_plan_session. Members who
+    have not set a pace are omitted. Call this before designing pace groups so
+    groups reflect the crew's real members instead of generic assumptions."""
     rows = fetch_membres_with_profils(crew_id)
     out = []
     for row in rows:
@@ -22,11 +28,12 @@ def get_membres_allures(crew_id: str) -> list:
         parsed = parse_numrange(profil.get("allure_footing"))
         if parsed is None:
             continue
+        basse_s, haute_s = parsed
         out.append(
             {
                 "nom_affichage": profil.get("nom_affichage"),
-                "allure_basse": parsed[0],
-                "allure_haute": parsed[1],
+                "allure_basse": secondes_vers_allure_decimale(basse_s),
+                "allure_haute": secondes_vers_allure_decimale(haute_s),
             }
         )
     return out

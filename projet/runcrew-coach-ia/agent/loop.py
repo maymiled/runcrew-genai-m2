@@ -1,5 +1,6 @@
 import os
 import sys
+from datetime import datetime
 
 import anthropic
 from mcp import ClientSession, StdioServerParameters
@@ -11,6 +12,13 @@ from agent.skill import SYSTEM_PROMPT
 MODEL = "claude-haiku-4-5"
 MAX_ITERS = 6
 TOLERANCE_MIN = 5
+
+JOURS_FR = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+
+
+def _aujourdhui_fr() -> str:
+    now = datetime.now()
+    return f"{JOURS_FR[now.weekday()]} {now.strftime('%Y-%m-%d')}"
 
 _client = anthropic.Anthropic()  # lit ANTHROPIC_API_KEY depuis l'environnement
 
@@ -55,7 +63,11 @@ async def run_agent(crew_id: str, brief: str, jwt: str) -> dict:
             messages = [
                 {
                     "role": "user",
-                    "content": f"crew_id: {crew_id}\nBrief du capitaine: {brief}",
+                    "content": (
+                        f"Nous sommes le {_aujourdhui_fr()}.\n"
+                        f"crew_id: {crew_id}\n"
+                        f"Brief du capitaine: {brief}"
+                    ),
                 }
             ]
 

@@ -22,6 +22,21 @@ const SUGGESTIONS = [
   'Sortie longue 1h30, allure fondamentale',
 ];
 
+function KipperBadge({ taille = 56 }: { taille?: number }) {
+  return (
+    <View style={[styles.kipperBadgeExterne, { width: taille, height: taille, borderRadius: taille / 2 }]}>
+      <View
+        style={[
+          styles.kipperBadgeInterne,
+          { width: taille - 12, height: taille - 12, borderRadius: (taille - 12) / 2 },
+        ]}
+      >
+        <Ionicons name="flash" size={taille * 0.42} color="#fff" />
+      </View>
+    </View>
+  );
+}
+
 export default function PageCoachIA() {
   const { crewId } = useLocalSearchParams<{ crewId: string }>();
   const [brief, setBrief] = useState('');
@@ -43,7 +58,7 @@ export default function PageCoachIA() {
         <TouchableOpacity style={styles.boutonRetour} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={26} color={COULEURS.night[700]} />
         </TouchableOpacity>
-        <Text style={styles.headerTitre}>Coach IA</Text>
+        <Text style={styles.headerTitre}>Coach Kipper</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -53,13 +68,11 @@ export default function PageCoachIA() {
       >
         <ScrollView contentContainerStyle={styles.contenu} keyboardShouldPersistTaps="handled">
           <View style={styles.introBloc}>
-            <View style={styles.iconeSparkle}>
-              <Ionicons name="sparkles" size={22} color={COULEURS.legend[500]} />
-            </View>
-            <Text style={styles.introTitre}>Décris la séance que tu veux</Text>
+            <KipperBadge />
+            <Text style={styles.introTitre}>Salut, c'est Kipper 👋</Text>
             <Text style={styles.introTexte}>
-              Le Coach IA lit les allures réelles de ton crew et te propose un déroulé complet avec des
-              groupes d'allure adaptés. Tu valides avant que ça parte.
+              Décris la séance que tu veux, je lis les allures réelles de ton crew et je te propose un
+              déroulé complet avec des groupes d'allure adaptés. Tu valides avant que ça parte.
             </Text>
           </View>
 
@@ -98,11 +111,14 @@ export default function PageCoachIA() {
             activeOpacity={0.85}
           >
             {chargement ? (
-              <ActivityIndicator color="#fff" />
+              <>
+                <ActivityIndicator color="#fff" />
+                <Text style={styles.boutonGenererTexte}>Kipper réfléchit...</Text>
+              </>
             ) : (
               <>
-                <Ionicons name="sparkles" size={18} color="#fff" />
-                <Text style={styles.boutonGenererTexte}>Générer le plan</Text>
+                <Ionicons name="flash" size={18} color="#fff" />
+                <Text style={styles.boutonGenererTexte}>Demander à Kipper</Text>
               </>
             )}
           </TouchableOpacity>
@@ -129,14 +145,16 @@ const styles = StyleSheet.create({
   contenu: { padding: ESPACEMENT.md, gap: ESPACEMENT.md, paddingBottom: ESPACEMENT.xl },
 
   introBloc: { alignItems: 'center', gap: 6, paddingVertical: ESPACEMENT.md },
-  iconeSparkle: {
-    width: 48,
-    height: 48,
-    borderRadius: RAYONS.full,
-    backgroundColor: COULEURS.legend[50],
+  kipperBadgeExterne: {
+    backgroundColor: COULEURS.volt[300],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
+  },
+  kipperBadgeInterne: {
+    backgroundColor: COULEURS.legend[500],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   introTitre: { fontSize: 18, fontWeight: '700', color: COULEURS.night[700], textAlign: 'center' },
   introTexte: { fontSize: 14, color: COULEURS.night[400], textAlign: 'center', lineHeight: 20 },

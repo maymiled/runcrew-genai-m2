@@ -26,7 +26,7 @@ export type DraftSession = {
 async function jetonActuel(): Promise<string> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
-  if (!token) throw new Error("Tu dois être connecté pour utiliser le Coach IA.");
+  if (!token) throw new Error("Tu dois être connecté pour demander à Kipper.");
   return token;
 }
 
@@ -60,7 +60,7 @@ export const useCoachStore = create<CoachStore>((set, get) => ({
       });
       const body = await res.json();
       if (!res.ok) {
-        throw new Error(body.message || "Le Coach IA n'a pas pu générer de plan. Réessaie.");
+        throw new Error(body.message || "Kipper n'a pas pu générer de plan. Réessaie.");
       }
       set({ brouillon: body.draft as DraftSession, chargement: false });
     } catch (e: any) {

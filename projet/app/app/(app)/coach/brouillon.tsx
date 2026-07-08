@@ -97,7 +97,7 @@ export default function PageBrouillonCoach() {
         <TouchableOpacity style={styles.boutonRetour} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={26} color={COULEURS.night[700]} />
         </TouchableOpacity>
-        <Text style={styles.headerTitre}>Aperçu du plan</Text>
+        <Text style={styles.headerTitre}>Le plan de Kipper</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -106,8 +106,14 @@ export default function PageBrouillonCoach() {
         <View style={[styles.hero, { backgroundColor: couleurType }]}>
           <View style={styles.heroOverlay} />
           <View style={styles.heroContenu}>
-            <View style={[styles.typeBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-              <Text style={styles.typeBadgeTexte}>{LABELS_TYPE[brouillon.type_entrainement].toUpperCase()}</Text>
+            <View style={styles.heroBadgesLigne}>
+              <View style={[styles.typeBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                <Text style={styles.typeBadgeTexte}>{LABELS_TYPE[brouillon.type_entrainement].toUpperCase()}</Text>
+              </View>
+              <View style={styles.kipperPill}>
+                <Ionicons name="flash" size={11} color={COULEURS.night[700]} />
+                <Text style={styles.kipperPillTexte}>Kipper</Text>
+              </View>
             </View>
             <Text style={styles.heroTitre}>{brouillon.titre}</Text>
             <Text style={styles.heroDate}>{formaterDateComplete(brouillon.heure_rdv)}</Text>
@@ -147,7 +153,7 @@ export default function PageBrouillonCoach() {
             <Text style={styles.accordeonTitre}>Groupes d'allure</Text>
             <Text style={styles.groupesSousTitre}>
               {brouillon.groupes.length} groupe{brouillon.groupes.length > 1 ? 's' : ''} proposé
-              {brouillon.groupes.length > 1 ? 's' : ''} par le Coach IA
+              {brouillon.groupes.length > 1 ? 's' : ''} par Kipper
             </Text>
             <View style={styles.groupesListe}>
               {brouillon.groupes.map((g, i) => (
@@ -281,8 +287,14 @@ const styles = StyleSheet.create({
   hero: { padding: ESPACEMENT.md, gap: 6, overflow: 'hidden' },
   heroOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.1)' },
   heroContenu: { gap: 6 },
+  heroBadgesLigne: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   typeBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: RAYONS.full },
   typeBadgeTexte: { fontSize: 11, fontWeight: '700', color: '#fff', letterSpacing: 0.5 },
+  kipperPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: COULEURS.volt[400], paddingHorizontal: 10, paddingVertical: 4, borderRadius: RAYONS.full,
+  },
+  kipperPillTexte: { fontSize: 11, fontWeight: '700', color: COULEURS.night[700] },
   heroTitre: { fontSize: 24, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
   heroDate: { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: '500' },
 

@@ -432,8 +432,10 @@ export default function PageCrew() {
                   onPress={() => router.push(`/coach/${id}` as any)}
                   activeOpacity={0.85}
                 >
-                  <Ionicons name="sparkles" size={20} color="#fff" />
-                  <Text style={styles.boutonCreerSessionTexte}>Coach IA</Text>
+                  <View style={styles.boutonCoachIAIcone}>
+                    <Ionicons name="flash" size={14} color={COULEURS.night[700]} />
+                  </View>
+                  <Text style={styles.boutonCreerSessionTexte}>Coach Kipper</Text>
                 </TouchableOpacity>
               )}
 
@@ -1198,12 +1200,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
   },
+  boutonCoachIAIcone: {
+    width: 22,
+    height: 22,
+    borderRadius: RAYONS.full,
+    backgroundColor: COULEURS.volt[400],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   boutonCoachIA: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: COULEURS.night[600],
+    backgroundColor: COULEURS.night[700],
     borderRadius: RAYONS.full,
     paddingVertical: 14,
     marginBottom: ESPACEMENT.md,

@@ -1,17 +1,18 @@
-# API / backend
-fastapi
-uvicorn[standard]
-python-dotenv
-httpx
+# Coach IA backend — RunCrew hackathon
 
-# LLM
+# LLM / API
 anthropic
+python-dotenv
 
-# MCP
+# Web
+flask
+flask-cors
+
+# MCP (agent tools)
 mcp
 
-# Supabase
-supabase
+# Supabase REST calls
+requests
 
 # RAG
 sentence-transformers

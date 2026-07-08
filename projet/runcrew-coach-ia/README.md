@@ -1,54 +1,55 @@
-# RunCrew — Coach IA
+# RunCrew — Coach IA (backend)
 
-Agent IA pour [RunCrew](../../README.md) : un capitaine de crew décrit en langage
-naturel la séance qu'il veut ("fractionné 45min, groupe mixte, mardi 19h"), et
-l'agent :
+Agent Haiku (reason → act → observe) qui génère un plan de séance (déroulé + groupes d'allure) personnalisé
+pour un crew RunCrew, à partir d'un brief en langage naturel du capitaine. Ne publie rien lui-même :
+le brouillon est validé par le capitaine avant écriture (`/coach/publish`).
 
-1. vérifie la charge d'entraînement récente du crew (évite deux séances intenses
-   d'affilée) ;
-2. consulte une base de connaissances coaching (RAG) pour s'inspirer d'une structure
-   éprouvée ;
-3. récupère les allures réelles des membres pour construire des groupes d'allure
-   adaptés ;
-4. consulte la météo au lieu/heure du rendez-vous ;
-5. ajuste itérativement le déroulé pour respecter la durée cible ;
-6. propose un brouillon de séance — **rien n'est écrit sans confirmation humaine** ;
-7. une fois confirmé, écrit la séance dans le Supabase du produit RunCrew (`sessions`
-   + `groupes_allure`).
+## Tools de l'agent
 
-C'est un service autonome (backend Python + mini frontend web) qui ne dépend pas du
-code de l'app mobile Expo — il lit/écrit directement dans le même Supabase.
-
-## Architecture
-
-- **Agent** : boucle reason→act→observe, Claude Haiku (`claude-haiku-4-5`), appels
-  d'outils manuels (`backend/agent.py`).
-- **MCP** : serveur stdio (FastMCP) exposant 6 tools (`backend/mcp_server.py`,
-  logique dans `backend/tools_impl.py`).
-- **RAG** : ChromaDB + `all-MiniLM-L6-v2` sur un corpus de principes de coaching +
-  templates de séances (`backend/rag/`, `backend/data/`).
-- **Backend** : FastAPI (`backend/app.py`), sert aussi le frontend statique.
-- **Frontend** : page de chat unique (`frontend/`), adaptée des maquettes RunCrew.
+- `get_membres_allures(crew_id)` — allures réelles des membres du crew (API Supabase, JWT du capitaine forwardé).
+- `search_coaching_knowledge(query, k)` — RAG sur une petite base de connaissances coaching (ChromaDB).
+- `get_meteo_prevision(ville, date_iso)` — prévision météo (Open-Meteo, gratuit, sans clé) pour adapter la
+  séance si forte chaleur/pluie/orage ; renvoie `{disponible: false, message}` proprement si la ville est
+  inconnue ou la date hors de la fenêtre de prévision (~16 jours).
+- `finaliser_plan_session` — sortie structurée finale (n'écrit rien en base). Le backend vérifie que la somme
+  des `duree_min` du déroulé colle à `duree_entrainement_min` (tolérance ±5 min) ; en cas d'écart, il renvoie
+  une correction à l'agent au lieu d'accepter le brouillon tel quel — une vraie itération sous contrainte,
+  pas une simple instruction de prompt.
 
 ## Setup
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
+python -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # puis remplir ANTHROPIC_API_KEY et SUPABASE_SERVICE_ROLE_KEY
+cp .env.example .env   # renseigner ANTHROPIC_API_KEY et SUPABASE_ANON_KEY
+python -m rag.build_index   # à lancer une fois (et à chaque modif de rag/knowledge/*.md)
+python app.py
 ```
+
+Le serveur écoute sur `0.0.0.0:5000` par défaut (`PORT=5050 python app.py` pour changer de port).
+Pour tester depuis un téléphone physique, utiliser l'IP LAN du poste (`ipconfig getifaddr en0` sur macOS)
+ou un tunnel `ngrok http 5000`.
+
+**macOS** : le port 5000 est souvent déjà pris par le récepteur AirPlay (Réglages Système → Général →
+AirDrop et Handoff → décocher "Récepteur AirPlay"), ou lancez simplement sur un autre port avec `PORT=5050`.
+
+## Mode mock (dev mobile sans agent réel)
 
 ```bash
-python scripts/seed_demo_data.py        # crée un crew + membres + séances de démo
-                                          # → copier DEMO_CREW_ID/DEMO_CAPTAIN_ID dans .env
-python backend/rag/build_index.py       # construit l'index Chroma (une seule fois)
-uvicorn backend.app:app --reload --app-dir .
-# ouvrir http://localhost:8000
+MOCK_COACH=1 python app.py
 ```
+`/coach/plan` renvoie alors un brouillon factice conforme au contrat JSON, sans appeler Claude ni Supabase.
 
-## Notes
+## Endpoints
 
-- Modèle : **Haiku uniquement** (contrainte du cours, budget API limité).
-- Pas d'authentification réelle côté frontend pour ce POC — le capitaine de démo
-  (`DEMO_CAPTAIN_ID`) est fixé en dur, c'est un choix de scope assumé (voir plan).
-- Aucune clé n'est committée (`.env` gitignoré).
+- `POST /coach/plan` — headers `Authorization: Bearer <jwt capitaine>`, body `{crew_id, brief}` → `{draft}`
+- `POST /coach/publish` — headers `Authorization: Bearer <jwt capitaine>`, body `{crew_id, cree_par, draft}` → `{session_id}`
+
+## Test rapide en ligne de commande
+
+```bash
+curl -X POST http://localhost:${PORT:-5000}/coach/plan \
+  -H "Authorization: Bearer <jwt>" -H "Content-Type: application/json" \
+  -d '{"crew_id": "<uuid>", "brief": "séance fractionné 45 min, focus seuil, groupe mixte"}'
+```

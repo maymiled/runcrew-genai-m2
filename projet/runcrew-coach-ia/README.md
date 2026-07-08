@@ -1,9 +1,20 @@
 # RunCrew — Coach IA (backend)
 
 Agent Haiku (reason → act → observe) qui génère un plan de séance (déroulé + groupes d'allure) personnalisé
-pour un crew RunCrew, à partir d'un brief en langage naturel du capitaine. RAG sur une petite base de
-connaissances coaching + lecture des allures réelles des membres via l'API Supabase. Ne publie rien lui-même :
+pour un crew RunCrew, à partir d'un brief en langage naturel du capitaine. Ne publie rien lui-même :
 le brouillon est validé par le capitaine avant écriture (`/coach/publish`).
+
+## Tools de l'agent
+
+- `get_membres_allures(crew_id)` — allures réelles des membres du crew (API Supabase, JWT du capitaine forwardé).
+- `search_coaching_knowledge(query, k)` — RAG sur une petite base de connaissances coaching (ChromaDB).
+- `get_meteo_prevision(ville, date_iso)` — prévision météo (Open-Meteo, gratuit, sans clé) pour adapter la
+  séance si forte chaleur/pluie/orage ; renvoie `{disponible: false, message}` proprement si la ville est
+  inconnue ou la date hors de la fenêtre de prévision (~16 jours).
+- `finaliser_plan_session` — sortie structurée finale (n'écrit rien en base). Le backend vérifie que la somme
+  des `duree_min` du déroulé colle à `duree_entrainement_min` (tolérance ±5 min) ; en cas d'écart, il renvoie
+  une correction à l'agent au lieu d'accepter le brouillon tel quel — une vraie itération sous contrainte,
+  pas une simple instruction de prompt.
 
 ## Setup
 

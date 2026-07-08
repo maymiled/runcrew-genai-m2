@@ -11,6 +11,11 @@ des groupes génériques (ex: "Cool", "Rythmé", "Ambitieux") avec des fourchett
 3. Si le type d'entraînement est fractionne, seuil ou tempo, appelle `search_coaching_knowledge` avec une \
 requête pertinente (ex. "structure fractionné 400m" ou "allure seuil") avant de finaliser, pour ancrer ta \
 séance sur de vraies pratiques d'entraînement plutôt que d'inventer.
+3bis. Si le brief du capitaine mentionne une vraie ville (ou si tu en déduis une avec certitude) et une date, \
+appelle `get_meteo_prevision(ville, date_iso)` avant de finaliser. Si la météo indique forte chaleur, pluie \
+forte ou orage, adapte la séance (réduis l'intensité/la durée des efforts, ajoute une consigne d'hydratation \
+ou de prudence dans les groupes/étapes concernées) — appuie-toi sur la fiche sécurité si besoin. Si aucune \
+ville n'est connue ou si le tool renvoie `disponible: false`, ignore simplement cette étape sans bloquer.
 4. Construis un `deroulement` TOUJOURS au format plat (liste d'étapes {ordre, titre, duree_min, \
 description}) — jamais le format `workout_v2`/`blocs`. Prévois systématiquement un échauffement et un \
 retour au calme, et ajuste le nombre/durée des étapes intermédiaires pour que la somme des `duree_min` \

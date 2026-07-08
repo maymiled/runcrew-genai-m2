@@ -10,12 +10,24 @@ from agent.skill import SYSTEM_PROMPT
 
 MODEL = "claude-haiku-4-5"
 MAX_ITERS = 6
+TOLERANCE_MIN = 5
 
 _client = anthropic.Anthropic()  # lit ANTHROPIC_API_KEY depuis l'environnement
 
 
 class AgentDidNotFinalizeError(Exception):
     pass
+
+
+def _duration_mismatch(draft: dict):
+    """Return (total, cible, ecart) if the déroulé's summed duree_min drifts from
+    duree_entrainement_min by more than TOLERANCE_MIN, else None."""
+    total = sum(e.get("duree_min", 0) for e in draft.get("deroulement", []))
+    cible = draft.get("duree_entrainement_min", 0)
+    ecart = total - cible
+    if abs(ecart) > TOLERANCE_MIN:
+        return total, cible, ecart
+    return None
 
 
 async def run_agent(crew_id: str, brief: str, jwt: str) -> dict:
@@ -65,12 +77,14 @@ async def run_agent(crew_id: str, brief: str, jwt: str) -> dict:
 
                 tool_results = []
                 draft = None
+                finalize_block_id = None
 
                 for block in resp.content:
                     if block.type != "tool_use":
                         continue
                     if block.name == "finaliser_plan_session":
                         draft = block.input
+                        finalize_block_id = block.id
                         continue
                     try:
                         out = await session.call_tool(block.name, block.input)
@@ -89,7 +103,25 @@ async def run_agent(crew_id: str, brief: str, jwt: str) -> dict:
                         )
 
                 if draft is not None:
-                    return draft
+                    mismatch = _duration_mismatch(draft)
+                    if mismatch is None:
+                        return draft
+                    # Itération sous contrainte : on ne fait pas confiance au modèle sur
+                    # parole, on vérifie la somme réelle et on renvoie une correction.
+                    total, cible, ecart = mismatch
+                    tool_results.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": finalize_block_id,
+                            "content": (
+                                f"Le déroulé totalise {total} min mais la durée cible est "
+                                f"{cible} min (écart de {ecart:+d} min, tolérance ±{TOLERANCE_MIN} min). "
+                                "Ajuste la durée ou le nombre des étapes intermédiaires et rappelle "
+                                "finaliser_plan_session avec un déroulé corrigé."
+                            ),
+                            "is_error": True,
+                        }
+                    )
 
                 messages.append({"role": "user", "content": tool_results})
 

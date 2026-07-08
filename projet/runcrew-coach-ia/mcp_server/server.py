@@ -2,6 +2,7 @@ from mcp.server.fastmcp import FastMCP
 
 from mcp_server.rag import search as rag_search
 from mcp_server.supabase_client import fetch_membres_with_profils, parse_numrange
+from mcp_server.weather import get_weather
 
 mcp_server = FastMCP("coach")
 
@@ -39,6 +40,17 @@ def search_coaching_knowledge(query: str, k: int = 3) -> list:
     text snippets. Call this before finalizing a plan whose type requires
     structured pacing knowledge (fractionne, seuil, tempo)."""
     return rag_search(query, k)
+
+
+@mcp_server.tool()
+def get_meteo_prevision(ville: str, date_iso: str) -> dict:
+    """Return the weather forecast for a city and date: {disponible, temperature_max,
+    temperature_min, precipitation_mm, condition} in °C/mm, or {disponible: false,
+    message} if the city can't be geocoded or the date is out of the ~16-day forecast
+    range. Call this only if you know a real city name and a date for the session
+    (e.g. from the captain's brief) — use it to adjust intensity/safety advice for
+    hot, cold, or rainy conditions. Skip it if no city is known."""
+    return get_weather(ville, date_iso)
 
 
 if __name__ == "__main__":

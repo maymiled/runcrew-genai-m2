@@ -18,6 +18,7 @@ import { supabase } from '../../../src/lib/supabase';
 import { useAuthStore } from '../../../src/stores/useAuthStore';
 import { useChatStore } from '../../../src/stores/useChatStore';
 import { router } from 'expo-router';
+import { questionnerKipper } from '../../../src/lib/coach';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -91,6 +92,7 @@ export default function ChatCrew() {
   const [texte, setTexte] = useState('');
   const [chargement, setChargement] = useState(true);
   const [envoi, setEnvoi] = useState(false);
+  const [kipperEnCours, setKipperEnCours] = useState(false);
 
   const profilsCache = useRef<Map<string, string>>(new Map());
   const flatListRef = useRef<FlatList>(null);
@@ -205,8 +207,25 @@ export default function ChatCrew() {
     const contenu = texte.trim();
     setTexte('');
     setEnvoi(true);
+
     await supabase.from('messages').insert({ crew_id: crewId, utilisateur_id: userId, contenu });
     setEnvoi(false);
+
+    // Détecter mention @Kipper et déclencher la réponse RAG
+    if (/^@kipper\b/i.test(contenu)) {
+      const question = contenu.replace(/^@kipper\s*/i, '').trim();
+      if (!question) return;
+      setKipperEnCours(true);
+      try {
+        const { data: { session: authSess } } = await supabase.auth.getSession();
+        const jwt = authSess?.access_token;
+        if (jwt) await questionnerKipper(crewId, question, userId, jwt);
+      } catch {
+        // La réponse de Kipper n'est pas critique — on fail silencieusement
+      } finally {
+        setKipperEnCours(false);
+      }
+    }
   }
 
   // ── Construire la liste avec séparateurs de date ──
@@ -276,6 +295,20 @@ export default function ChatCrew() {
             }
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="on-drag"
+            ListFooterComponent={kipperEnCours ? (
+              <View style={[styles.msgRow, styles.msgRowAutre]}>
+                <View style={styles.avatarKipper}>
+                  <Text style={styles.avatarKipperTexte}>🐾</Text>
+                </View>
+                <View style={styles.msgCorps}>
+                  <Text style={styles.msgNomKipper}>Kipper</Text>
+                  <View style={styles.bulleKipperTyping}>
+                    <ActivityIndicator size="small" color={COULEURS.legend[400]} />
+                    <Text style={styles.kipperTypingTexte}>Kipper réfléchit…</Text>
+                  </View>
+                </View>
+              </View>
+            ) : null}
             renderItem={({ item }) => {
               if (item.type === 'date') {
                 return (
@@ -288,8 +321,34 @@ export default function ChatCrew() {
               }
 
               const { msg } = item;
-              const estMoi = msg.utilisateur_id === userId;
+              const estKipper = msg.contenu.startsWith('🐾 Kipper :');
+              const estMoi = !estKipper && msg.utilisateur_id === userId;
               const couleur = estMoi ? COULEURS.legend[500] : couleurMembre(msg.utilisateur_id);
+              const contenuAffiche = estKipper
+                ? msg.contenu.replace('🐾 Kipper :', '').trim()
+                : msg.contenu;
+
+              if (estKipper) {
+                return (
+                  <View style={[styles.msgRow, styles.msgRowAutre]}>
+                    <View style={styles.avatarKipper}>
+                      <Text style={styles.avatarKipperTexte}>🐾</Text>
+                    </View>
+                    <View style={styles.msgCorps}>
+                      <View style={styles.kipperNomRow}>
+                        <Text style={styles.msgNomKipper}>Kipper</Text>
+                        <View style={styles.kipperBadge}>
+                          <Text style={styles.kipperBadgeTexte}>Coach IA</Text>
+                        </View>
+                      </View>
+                      <View style={styles.bulleKipper}>
+                        <Text style={styles.bulleTexteKipper}>{contenuAffiche}</Text>
+                      </View>
+                      <Text style={styles.heureAutre}>{formaterHeure(msg.cree_le)}</Text>
+                    </View>
+                  </View>
+                );
+              }
 
               return (
                 <View
@@ -326,24 +385,36 @@ export default function ChatCrew() {
 
         {/* Barre d'envoi */}
         <View style={[styles.barreEnvoi, { paddingBottom: insets.bottom || ESPACEMENT.sm }]}>
-          <TextInput
-            style={styles.input}
-            value={texte}
-            onChangeText={setTexte}
-            placeholder="Écris un message…"
-            placeholderTextColor={COULEURS.night[300]}
-            multiline
-            maxLength={500}
-            returnKeyType="send"
-            onSubmitEditing={envoyerMessage}
-          />
-          <TouchableOpacity
-            style={[styles.boutonEnvoi, (!texte.trim() || envoi) && styles.boutonEnvoiOff]}
-            onPress={envoyerMessage}
-            disabled={!texte.trim() || envoi}
-          >
-            <Ionicons name="send" size={18} color="#fff" />
-          </TouchableOpacity>
+          {/* Chip @Kipper — s'affiche si l'input est vide */}
+          {!texte && (
+            <TouchableOpacity
+              style={styles.kipperChip}
+              onPress={() => setTexte('@Kipper ')}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.kipperChipTexte}>🐾 @Kipper</Text>
+            </TouchableOpacity>
+          )}
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.input}
+              value={texte}
+              onChangeText={setTexte}
+              placeholder="Écris un message…"
+              placeholderTextColor={COULEURS.night[300]}
+              multiline
+              maxLength={500}
+              returnKeyType="send"
+              onSubmitEditing={envoyerMessage}
+            />
+            <TouchableOpacity
+              style={[styles.boutonEnvoi, (!texte.trim() || envoi) && styles.boutonEnvoiOff]}
+              onPress={envoyerMessage}
+              disabled={!texte.trim() || envoi}
+            >
+              <Ionicons name="send" size={18} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -423,14 +494,17 @@ const styles = StyleSheet.create({
   heureAutre: { marginLeft: 4 },
 
   barreEnvoi: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: ESPACEMENT.sm,
+    gap: 8,
     paddingHorizontal: ESPACEMENT.md,
-    paddingVertical: ESPACEMENT.sm,
+    paddingTop: ESPACEMENT.sm,
     borderTopWidth: 1,
     borderTopColor: COULEURS.night[100],
     backgroundColor: '#fff',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: ESPACEMENT.sm,
   },
   input: {
     flex: 1,
@@ -454,4 +528,91 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   boutonEnvoiOff: { opacity: 0.4 },
+
+  // ── Chip @Kipper ──
+  kipperChip: {
+    alignSelf: 'flex-start',
+    backgroundColor: COULEURS.legend[50],
+    borderWidth: 1.5,
+    borderColor: COULEURS.legend[200],
+    borderRadius: RAYONS.full,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  kipperChipTexte: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COULEURS.legend[600],
+  },
+
+  // ── Avatar et bulles Kipper ──
+  avatarKipper: {
+    width: 30,
+    height: 30,
+    borderRadius: RAYONS.full,
+    backgroundColor: COULEURS.legend[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  avatarKipperTexte: { fontSize: 14 },
+
+  kipperNomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginLeft: 4,
+    marginBottom: 1,
+  },
+  msgNomKipper: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COULEURS.legend[500],
+  },
+  kipperBadge: {
+    backgroundColor: COULEURS.legend[500],
+    borderRadius: RAYONS.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  kipperBadgeTexte: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 0.3,
+  },
+  bulleKipper: {
+    borderRadius: 18,
+    borderBottomLeftRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: COULEURS.legend[50],
+    borderWidth: 1.5,
+    borderColor: COULEURS.legend[200],
+    maxWidth: '100%',
+  },
+  bulleTexteKipper: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: COULEURS.night[700],
+  },
+
+  // Typing indicator
+  bulleKipperTyping: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 18,
+    borderBottomLeftRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: COULEURS.legend[50],
+    borderWidth: 1.5,
+    borderColor: COULEURS.legend[200],
+  },
+  kipperTypingTexte: {
+    fontSize: 14,
+    color: COULEURS.legend[400],
+    fontStyle: 'italic',
+  },
 });

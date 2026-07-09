@@ -24,6 +24,27 @@ export type AnalyseResultat = {
   ajustements_groupes: AjustementGroupe[];
 };
 
+export async function questionnerKipper(
+  crewId: string,
+  question: string,
+  utilisateurId: string,
+  jwt: string,
+): Promise<string> {
+  const res = await fetch(`${COACH_API_URL}/coach/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${jwt}`,
+    },
+    body: JSON.stringify({ crew_id: crewId, question, utilisateur_id: utilisateurId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as any).message || `Erreur serveur ${res.status}`);
+  }
+  return ((await res.json()) as { reponse: string }).reponse;
+}
+
 export async function analyserSeance(
   sessionId: string,
   crewId: string,

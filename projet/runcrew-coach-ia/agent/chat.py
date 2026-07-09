@@ -1,5 +1,6 @@
 import os
 import sys
+from datetime import date
 
 import anthropic
 from mcp import ClientSession, StdioServerParameters
@@ -43,7 +44,9 @@ async def run_chat(
                 if t.name in ALLOWED
             ] + [FINALIZE_CHAT_SCHEMA]
 
+            today = date.today().isoformat()
             user_content = f"crew_id: {crew_id}\n"
+            user_content += f"date_du_jour: {today}\n"
             if utilisateur_id:
                 user_content += f"utilisateur_id: {utilisateur_id}\n"
             user_content += f"Question @Kipper : {question}"

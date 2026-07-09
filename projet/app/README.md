@@ -29,9 +29,9 @@ Row Level Security policies) en dur dans `src/lib/constantes.ts`, pas de `.env`
 requis pour ça. Aucune clé API (Anthropic) n'est utilisée côté mobile — l'agent
 tourne uniquement côté backend.
 
-Pour pointer vers le backend Coach IA déployé plutôt que sur `localhost`, copier
-`.env.example` en `.env` et renseigner `EXPO_PUBLIC_COACH_API_URL` (voir
-[`../README.md`](../README.md) pour le déploiement Render du backend).
+Le backend Coach IA tourne en local (voir `../runcrew-coach-ia/README.md`). Si tu
+testes sur un device physique ou une IP LAN différente de `localhost`, copie
+`.env.example` en `.env` et ajuste `EXPO_PUBLIC_COACH_API_URL`.
 
 ## Lancer
 

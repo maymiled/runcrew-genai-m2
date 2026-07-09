@@ -11,7 +11,7 @@ from flask_cors import CORS  # noqa: E402
 from agent.analyse import run_analyse  # noqa: E402
 from agent.chat import run_chat  # noqa: E402
 from agent.loop import AgentDidNotFinalizeError, run_agent  # noqa: E402
-from publish.supabase_write import insert_groupes, insert_session, poster_message  # noqa: E402
+from publish.supabase_write import insert_groupes, insert_session  # noqa: E402
 
 app = Flask(__name__)
 CORS(app, resources={r"/coach/*": {"origins": "*"}})
@@ -113,7 +113,6 @@ def coach_chat():
 
     try:
         reponse = asyncio.run(run_chat(crew_id, question, utilisateur_id, jwt))
-        poster_message(jwt, crew_id, f"🐾 Kipper : {reponse}")
     except AgentDidNotFinalizeError:
         return jsonify(
             error="agent_no_finalize",

@@ -28,6 +28,7 @@ type Message = {
   contenu: string;
   cree_le: string;
   nomAffichage: string;
+  estKipper?: boolean; // message local uniquement, non persisté en DB
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -216,12 +217,28 @@ export default function ChatCrew() {
       const question = contenu.replace(/^@kipper\s*/i, '').trim();
       if (!question) return;
       setKipperEnCours(true);
+
+      const ajouterMsgKipper = (texte: string) => {
+        const msg: Message = {
+          id: `kipper-${Date.now()}`,
+          utilisateur_id: 'kipper',
+          contenu: texte,
+          cree_le: new Date().toISOString(),
+          nomAffichage: 'Kipper',
+          estKipper: true,
+        };
+        setMessages((prev) => [...prev, msg]);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
+      };
+
       try {
         const { data: { session: authSess } } = await supabase.auth.getSession();
         const jwt = authSess?.access_token;
-        if (jwt) await questionnerKipper(crewId, question, userId, jwt);
+        if (!jwt) throw new Error('Session expirée');
+        const reponse = await questionnerKipper(crewId, question, userId, jwt);
+        ajouterMsgKipper(reponse);
       } catch {
-        // La réponse de Kipper n'est pas critique — on fail silencieusement
+        ajouterMsgKipper('Je suis temporairement indisponible. Réessaie dans quelques instants.');
       } finally {
         setKipperEnCours(false);
       }
@@ -321,12 +338,10 @@ export default function ChatCrew() {
               }
 
               const { msg } = item;
-              const estKipper = msg.contenu.startsWith('🐾 Kipper :');
+              const estKipper = !!msg.estKipper;
               const estMoi = !estKipper && msg.utilisateur_id === userId;
               const couleur = estMoi ? COULEURS.legend[500] : couleurMembre(msg.utilisateur_id);
-              const contenuAffiche = estKipper
-                ? msg.contenu.replace('🐾 Kipper :', '').trim()
-                : msg.contenu;
+              const contenuAffiche = msg.contenu;
 
               if (estKipper) {
                 return (

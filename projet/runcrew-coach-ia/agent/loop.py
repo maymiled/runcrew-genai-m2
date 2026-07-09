@@ -38,9 +38,12 @@ def _duration_mismatch(draft: dict):
     return None
 
 
-async def run_agent(crew_id: str, brief: str, jwt: str) -> dict:
-    """Reason -> act -> observe loop. Spawns a fresh MCP server subprocess per
-    call, with the captain's JWT injected via env so Claude never sees it."""
+async def run_agent_stream(crew_id: str, brief: str, jwt: str):
+    """Reason -> act -> observe loop, yielding one event per step AS IT HAPPENS —
+    this is the debug-mode instrument: {type: reasoning|tool_call|tool_result|final|error}.
+    Spawns a fresh MCP server subprocess per call, with the captain's JWT injected via
+    env so Claude never sees it.
+    """
     env = {
         **os.environ,
         "SUPABASE_JWT": jwt,
@@ -81,11 +84,19 @@ async def run_agent(crew_id: str, brief: str, jwt: str) -> dict:
                 )
 
                 if resp.stop_reason != "tool_use":
-                    raise AgentDidNotFinalizeError(
-                        "Le modèle a terminé sans appeler finaliser_plan_session"
-                    )
+                    yield {
+                        "type": "error",
+                        "message": "Le modèle a terminé sans appeler finaliser_plan_session",
+                    }
+                    return
 
                 messages.append({"role": "assistant", "content": resp.content})
+
+                # Le raisonnement (règle 0 du skill) arrive comme bloc texte, dans le
+                # même tour que les tool_use qu'il justifie -- on l'émet d'abord.
+                for block in resp.content:
+                    if block.type == "text" and block.text.strip():
+                        yield {"type": "reasoning", "text": block.text.strip()}
 
                 tool_results = []
                 draft = None
@@ -98,43 +109,67 @@ async def run_agent(crew_id: str, brief: str, jwt: str) -> dict:
                         draft = block.input
                         finalize_block_id = block.id
                         continue
+                    yield {"type": "tool_call", "tool": block.name, "input": block.input}
                     try:
                         out = await session.call_tool(block.name, block.input)
                         text = "\n".join(c.text for c in out.content)
                         tool_results.append(
                             {"type": "tool_result", "tool_use_id": block.id, "content": text}
                         )
+                        yield {"type": "tool_result", "tool": block.name, "output": text, "is_error": False}
                     except Exception as e:  # noqa: BLE001
+                        err_text = f"Erreur: {e}"
                         tool_results.append(
                             {
                                 "type": "tool_result",
                                 "tool_use_id": block.id,
-                                "content": f"Erreur: {e}",
+                                "content": err_text,
                                 "is_error": True,
                             }
                         )
+                        yield {"type": "tool_result", "tool": block.name, "output": err_text, "is_error": True}
 
                 if draft is not None:
+                    yield {"type": "tool_call", "tool": "finaliser_plan_session", "input": draft}
                     mismatch = _duration_mismatch(draft)
                     if mismatch is None:
-                        return draft
+                        yield {"type": "final", "result": draft}
+                        return
                     # Itération sous contrainte : on ne fait pas confiance au modèle sur
                     # parole, on vérifie la somme réelle et on renvoie une correction.
                     total, cible, ecart = mismatch
+                    correction = (
+                        f"Le déroulé totalise {total} min mais la durée cible est "
+                        f"{cible} min (écart de {ecart:+d} min, tolérance ±{TOLERANCE_MIN} min). "
+                        "Ajuste la durée ou le nombre des étapes intermédiaires et rappelle "
+                        "finaliser_plan_session avec un déroulé corrigé."
+                    )
                     tool_results.append(
                         {
                             "type": "tool_result",
                             "tool_use_id": finalize_block_id,
-                            "content": (
-                                f"Le déroulé totalise {total} min mais la durée cible est "
-                                f"{cible} min (écart de {ecart:+d} min, tolérance ±{TOLERANCE_MIN} min). "
-                                "Ajuste la durée ou le nombre des étapes intermédiaires et rappelle "
-                                "finaliser_plan_session avec un déroulé corrigé."
-                            ),
+                            "content": correction,
                             "is_error": True,
                         }
                     )
+                    yield {
+                        "type": "tool_result",
+                        "tool": "finaliser_plan_session",
+                        "output": correction,
+                        "is_error": True,
+                    }
 
                 messages.append({"role": "user", "content": tool_results})
 
-            raise AgentDidNotFinalizeError(f"max_iters ({MAX_ITERS}) atteint sans finalisation")
+            yield {"type": "error", "message": f"max_iters ({MAX_ITERS}) atteint sans finalisation"}
+
+
+async def run_agent(crew_id: str, brief: str, jwt: str) -> dict:
+    """Non-streaming wrapper around run_agent_stream, for callers that only want
+    the final draft (e.g. /coach/plan without debug mode). Behaviour unchanged."""
+    async for event in run_agent_stream(crew_id, brief, jwt):
+        if event["type"] == "final":
+            return event["result"]
+        if event["type"] == "error":
+            raise AgentDidNotFinalizeError(event["message"])
+    raise AgentDidNotFinalizeError("Boucle terminée sans résultat")

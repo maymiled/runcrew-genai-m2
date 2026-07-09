@@ -7,12 +7,14 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import TraceDebug from '../../../src/components/TraceDebug';
 import { COULEURS, ESPACEMENT, RAYONS } from '../../../src/lib/constantes';
 import { useCoachStore } from '../../../src/stores/useCoachStore';
 
@@ -40,12 +42,25 @@ function KipperBadge({ taille = 56 }: { taille?: number }) {
 export default function PageCoachIA() {
   const { crewId } = useLocalSearchParams<{ crewId: string }>();
   const [brief, setBrief] = useState('');
-  const { chargement, erreur, genererPlan } = useCoachStore();
+  const {
+    chargement,
+    erreur,
+    genererPlan,
+    genererPlanDebug,
+    modeDebug,
+    toggleModeDebug,
+    evenementsDebug,
+    enCoursDebug,
+  } = useCoachStore();
 
   async function handleGenerer() {
     if (!crewId || !brief.trim()) return;
     try {
-      await genererPlan(crewId, brief.trim());
+      if (modeDebug) {
+        await genererPlanDebug(crewId, brief.trim());
+      } else {
+        await genererPlan(crewId, brief.trim());
+      }
       router.push(`/coach/brouillon?crewId=${crewId}` as any);
     } catch {
       // erreur déjà affichée via le store
@@ -94,6 +109,23 @@ export default function PageCoachIA() {
               </TouchableOpacity>
             ))}
           </View>
+
+          <View style={styles.toggleDebugLigne}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.toggleDebugTitre}>Mode debug</Text>
+              <Text style={styles.toggleDebugSousTitre}>
+                Voir le raisonnement de Kipper et ses appels d'outils en direct
+              </Text>
+            </View>
+            <Switch
+              value={modeDebug}
+              onValueChange={toggleModeDebug}
+              trackColor={{ false: COULEURS.night[200], true: COULEURS.legend[400] }}
+              thumbColor="#fff"
+            />
+          </View>
+
+          {modeDebug && <TraceDebug evenements={evenementsDebug} enCours={enCoursDebug} />}
 
           {erreur && (
             <View style={styles.erreurBloc}>
@@ -177,6 +209,17 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   suggestionTexte: { fontSize: 13, color: COULEURS.night[500] },
+
+  toggleDebugLigne: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ESPACEMENT.sm,
+    backgroundColor: COULEURS.night[50],
+    borderRadius: RAYONS.md,
+    padding: ESPACEMENT.sm,
+  },
+  toggleDebugTitre: { fontSize: 14, fontWeight: '700', color: COULEURS.night[700] },
+  toggleDebugSousTitre: { fontSize: 12, color: COULEURS.night[400], marginTop: 2 },
 
   erreurBloc: {
     flexDirection: 'row',

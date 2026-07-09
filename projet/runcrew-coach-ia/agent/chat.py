@@ -15,14 +15,15 @@ MAX_ITERS = 6
 _client = anthropic.Anthropic()
 
 
-async def run_chat(
+async def run_chat_stream(
     crew_id: str,
     question: str,
     utilisateur_id: str | None,
     jwt: str,
-) -> str:
-    """Agent loop: searches coaching KB, optionally checks runner history, returns response text.
-    The Flask route is responsible for posting the response to the crew chat."""
+):
+    """Reason -> act -> observe loop for the crew-chat @Kipper mention, yielding
+    one event per step AS IT HAPPENS: {type: reasoning|tool_call|tool_result|final|error}.
+    Same shape as agent.loop.run_agent_stream -- only the tools/skill/schema differ."""
     env = {**os.environ, "SUPABASE_JWT": jwt}
     params = StdioServerParameters(
         command=sys.executable,
@@ -60,11 +61,17 @@ async def run_chat(
                 )
 
                 if resp.stop_reason != "tool_use":
-                    raise AgentDidNotFinalizeError(
-                        "L'agent n'a pas appelé finaliser_reponse_chat"
-                    )
+                    yield {
+                        "type": "error",
+                        "message": "L'agent n'a pas appelé finaliser_reponse_chat",
+                    }
+                    return
 
                 messages.append({"role": "assistant", "content": resp.content})
+
+                for block in resp.content:
+                    if block.type == "text" and block.text.strip():
+                        yield {"type": "reasoning", "text": block.text.strip()}
 
                 tool_results = []
                 reponse = None
@@ -77,41 +84,60 @@ async def run_chat(
                         reponse = block.input.get("reponse") or ""
                         finalize_id = block.id
                         continue
+                    yield {"type": "tool_call", "tool": block.name, "input": block.input}
                     try:
                         out = await session.call_tool(block.name, block.input)
                         text = "\n".join(c.text for c in out.content) or "(aucun résultat)"
                         tool_results.append(
                             {"type": "tool_result", "tool_use_id": block.id, "content": text}
                         )
+                        yield {"type": "tool_result", "tool": block.name, "output": text, "is_error": False}
                     except Exception as e:  # noqa: BLE001
+                        err_text = f"Erreur: {e}"
                         tool_results.append(
                             {
                                 "type": "tool_result",
                                 "tool_use_id": block.id,
-                                "content": f"Erreur: {e}",
+                                "content": err_text,
                                 "is_error": True,
                             }
                         )
+                        yield {"type": "tool_result", "tool": block.name, "output": err_text, "is_error": True}
 
                 if finalize_id is not None:
                     if not reponse:
                         reponse = "Désolé, je n'ai pas pu formuler de réponse."
+                    yield {"type": "tool_call", "tool": "finaliser_reponse_chat", "input": {"reponse": reponse}}
                     tool_results.append(
                         {"type": "tool_result", "tool_use_id": finalize_id, "content": "OK"}
                     )
                     messages.append({"role": "user", "content": tool_results})
-                    return reponse
+                    yield {"type": "final", "result": reponse}
+                    return
 
                 if not tool_results:
                     for block in resp.content:
                         if block.type == "tool_use":
+                            err_text = "Erreur: résultat manquant."
                             tool_results.append({
                                 "type": "tool_result",
                                 "tool_use_id": block.id,
-                                "content": "Erreur: résultat manquant.",
+                                "content": err_text,
                                 "is_error": True,
                             })
+                            yield {"type": "tool_result", "tool": block.name, "output": err_text, "is_error": True}
 
                 messages.append({"role": "user", "content": tool_results})
 
-            raise AgentDidNotFinalizeError(f"max_iters ({MAX_ITERS}) atteint sans finalisation")
+            yield {"type": "error", "message": f"max_iters ({MAX_ITERS}) atteint sans finalisation"}
+
+
+async def run_chat(crew_id: str, question: str, utilisateur_id: str | None, jwt: str) -> str:
+    """Non-streaming wrapper around run_chat_stream. Behaviour unchanged for
+    existing callers (/coach/chat without debug mode)."""
+    async for event in run_chat_stream(crew_id, question, utilisateur_id, jwt):
+        if event["type"] == "final":
+            return event["result"]
+        if event["type"] == "error":
+            raise AgentDidNotFinalizeError(event["message"])
+    raise AgentDidNotFinalizeError("Boucle terminée sans résultat")

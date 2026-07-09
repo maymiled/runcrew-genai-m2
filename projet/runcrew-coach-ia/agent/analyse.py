@@ -15,8 +15,10 @@ MAX_ITERS = 10
 _client = anthropic.Anthropic()
 
 
-async def run_analyse(session_id: str, crew_id: str, jwt: str) -> dict:
-    """Agent loop: fetches bilans, analyses patterns, posts to chat, returns structured results."""
+async def run_analyse_stream(session_id: str, crew_id: str, jwt: str):
+    """Reason -> act -> observe loop for the post-session analysis, yielding one
+    event per step AS IT HAPPENS: {type: reasoning|tool_call|tool_result|final|error}.
+    Same shape as agent.loop.run_agent_stream -- only the tools/skill/schema differ."""
     env = {**os.environ, "SUPABASE_JWT": jwt}
     params = StdioServerParameters(
         command=sys.executable,
@@ -54,11 +56,17 @@ async def run_analyse(session_id: str, crew_id: str, jwt: str) -> dict:
                 )
 
                 if resp.stop_reason != "tool_use":
-                    raise AgentDidNotFinalizeError(
-                        "L'agent a terminé sans appeler finaliser_analyse_seance"
-                    )
+                    yield {
+                        "type": "error",
+                        "message": "L'agent a terminé sans appeler finaliser_analyse_seance",
+                    }
+                    return
 
                 messages.append({"role": "assistant", "content": resp.content})
+
+                for block in resp.content:
+                    if block.type == "text" and block.text.strip():
+                        yield {"type": "reasoning", "text": block.text.strip()}
 
                 tool_results = []
                 analyse = None
@@ -71,23 +79,28 @@ async def run_analyse(session_id: str, crew_id: str, jwt: str) -> dict:
                         analyse = block.input
                         finalize_block_id = block.id
                         continue
+                    yield {"type": "tool_call", "tool": block.name, "input": block.input}
                     try:
                         out = await session.call_tool(block.name, block.input)
                         text = "\n".join(c.text for c in out.content)
                         tool_results.append(
                             {"type": "tool_result", "tool_use_id": block.id, "content": text}
                         )
+                        yield {"type": "tool_result", "tool": block.name, "output": text, "is_error": False}
                     except Exception as e:  # noqa: BLE001
+                        err_text = f"Erreur: {e}"
                         tool_results.append(
                             {
                                 "type": "tool_result",
                                 "tool_use_id": block.id,
-                                "content": f"Erreur: {e}",
+                                "content": err_text,
                                 "is_error": True,
                             }
                         )
+                        yield {"type": "tool_result", "tool": block.name, "output": err_text, "is_error": True}
 
                 if analyse is not None:
+                    yield {"type": "tool_call", "tool": "finaliser_analyse_seance", "input": analyse}
                     tool_results.append(
                         {
                             "type": "tool_result",
@@ -96,8 +109,20 @@ async def run_analyse(session_id: str, crew_id: str, jwt: str) -> dict:
                         }
                     )
                     messages.append({"role": "user", "content": tool_results})
-                    return analyse
+                    yield {"type": "final", "result": analyse}
+                    return
 
                 messages.append({"role": "user", "content": tool_results})
 
-            raise AgentDidNotFinalizeError(f"max_iters ({MAX_ITERS}) atteint sans finalisation")
+            yield {"type": "error", "message": f"max_iters ({MAX_ITERS}) atteint sans finalisation"}
+
+
+async def run_analyse(session_id: str, crew_id: str, jwt: str) -> dict:
+    """Non-streaming wrapper around run_analyse_stream. Behaviour unchanged for
+    existing callers (/coach/analyse without debug mode)."""
+    async for event in run_analyse_stream(session_id, crew_id, jwt):
+        if event["type"] == "final":
+            return event["result"]
+        if event["type"] == "error":
+            raise AgentDidNotFinalizeError(event["message"])
+    raise AgentDidNotFinalizeError("Boucle terminée sans résultat")

@@ -36,7 +36,7 @@ async def run_chat(
             mcp_tools = await session.list_tools()
 
             # Only expose the tools useful for answering a chat question
-            ALLOWED = {"search_coaching_knowledge", "get_historique_runner"}
+            ALLOWED = {"search_coaching_knowledge", "get_historique_runner", "get_meteo_prevision"}
             anthropic_tools = [
                 {"name": t.name, "description": t.description, "input_schema": t.inputSchema}
                 for t in mcp_tools.tools

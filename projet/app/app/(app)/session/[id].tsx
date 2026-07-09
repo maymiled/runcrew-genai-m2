@@ -24,7 +24,8 @@ import { supabase } from '../../../src/lib/supabase';
 import { useAuthStore } from '../../../src/stores/useAuthStore';
 import { TypeEntrainement, StatutConfirmation } from '../../../src/types/base';
 import { Session, GroupeAllure, EtapeDeroulement, BilanSeance } from '../../../src/types/session';
-import { analyserSeance, AnalyseResultat } from '../../../src/lib/coach';
+import { analyserSeance, analyserSeanceDebug, AnalyseResultat, EvenementDebug } from '../../../src/lib/coach';
+import TraceDebug from '../../../src/components/TraceDebug';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -136,6 +137,8 @@ export default function PageSession() {
   const [analyseEnCours, setAnalyseEnCours] = useState(false);
   const [analyseResultat, setAnalyseResultat] = useState<AnalyseResultat | null>(null);
   const [analyseEtape, setAnalyseEtape] = useState(0);
+  const [modeDebugAnalyse, setModeDebugAnalyse] = useState(false);
+  const [evenementsDebugAnalyse, setEvenementsDebugAnalyse] = useState<EvenementDebug[]>([]);
   const [bilanMin, setBilanMin] = useState(5);
   const [bilanSec, setBilanSec] = useState(30);
   const [bilanRessenti, setBilanRessenti] = useState<number | null>(null);
@@ -278,18 +281,27 @@ export default function PageSession() {
     if (!sessionData || analyseEnCours) return;
     setAnalyseEnCours(true);
     setAnalyseEtape(0);
-    const intervalId = setInterval(() => setAnalyseEtape(e => (e + 1) % 3), 2200);
+    setEvenementsDebugAnalyse([]);
+    // La rotation de texte factice ne sert que quand le mode debug est off --
+    // avec lui, la vraie trace remplace cette simulation.
+    const intervalId = modeDebugAnalyse
+      ? null
+      : setInterval(() => setAnalyseEtape(e => (e + 1) % 3), 2200);
     try {
       const { data: { session: authSess } } = await supabase.auth.getSession();
       const jwt = authSess?.access_token;
       if (!jwt) throw new Error('Session expirée — reconnecte-toi.');
-      const result = await analyserSeance(id!, sessionData.crew_id, jwt);
+      const result = modeDebugAnalyse
+        ? await analyserSeanceDebug(id!, sessionData.crew_id, jwt, (nouveaux) =>
+            setEvenementsDebugAnalyse((prev) => [...prev, ...nouveaux]),
+          )
+        : await analyserSeance(id!, sessionData.crew_id, jwt);
       setAnalyseResultat(result);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e: any) {
       Alert.alert('Analyse impossible', e.message || "Le serveur Kipper n'est pas joignable.");
     } finally {
-      clearInterval(intervalId);
+      if (intervalId) clearInterval(intervalId);
       setAnalyseEnCours(false);
     }
   }
@@ -676,6 +688,17 @@ export default function PageSession() {
                     Kipper analyse les bilans, détecte les patterns et poste un récap dans le chat.
                   </Text>
                 </View>
+                <TouchableOpacity
+                  onPress={() => setModeDebugAnalyse((v) => !v)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={[stylesKipper.debugBtn, modeDebugAnalyse && stylesKipper.debugBtnActif]}
+                >
+                  <Ionicons
+                    name="bug"
+                    size={16}
+                    color={modeDebugAnalyse ? COULEURS.legend[500] : COULEURS.night[300]}
+                  />
+                </TouchableOpacity>
               </View>
               <TouchableOpacity
                 style={[stylesKipper.bouton, analyseEnCours && { opacity: 0.75 }]}
@@ -701,6 +724,9 @@ export default function PageSession() {
                   </>
                 )}
               </TouchableOpacity>
+              {modeDebugAnalyse && (analyseEnCours || evenementsDebugAnalyse.length > 0) && (
+                <TraceDebug evenements={evenementsDebugAnalyse} enCours={analyseEnCours} />
+              )}
             </View>
           )
         )}
@@ -1657,6 +1683,8 @@ const stylesKipper = StyleSheet.create({
   },
   titre: { fontSize: 15, fontWeight: '700', color: COULEURS.night[700], marginTop: 1 },
   sous: { fontSize: 11, color: COULEURS.night[400], marginTop: 2, lineHeight: 16 },
+  debugBtn: { padding: 6, borderRadius: RAYONS.full },
+  debugBtnActif: { backgroundColor: COULEURS.legend[50] },
   bouton: {
     flexDirection: 'row',
     alignItems: 'center',

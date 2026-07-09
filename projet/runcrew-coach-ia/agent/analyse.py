@@ -119,10 +119,22 @@ async def run_analyse_stream(session_id: str, crew_id: str, jwt: str):
 
 async def run_analyse(session_id: str, crew_id: str, jwt: str) -> dict:
     """Non-streaming wrapper around run_analyse_stream. Behaviour unchanged for
-    existing callers (/coach/analyse without debug mode)."""
+    existing callers (/coach/analyse without debug mode).
+
+    Drains the generator to completion instead of `return`ing/`raise`ing from
+    inside the `async for` -- exiting early leaves it suspended mid `async with`
+    (stdio_client/ClientSession), and its eventual aclose() runs in the wrong
+    anyio cancel scope, crashing the *next* call. Same fix as agent/chat.py's
+    run_chat / agent/loop.py's run_agent."""
+    result = None
+    error = None
     async for event in run_analyse_stream(session_id, crew_id, jwt):
         if event["type"] == "final":
-            return event["result"]
-        if event["type"] == "error":
-            raise AgentDidNotFinalizeError(event["message"])
+            result = event["result"]
+        elif event["type"] == "error":
+            error = event["message"]
+    if error:
+        raise AgentDidNotFinalizeError(error)
+    if result is not None:
+        return result
     raise AgentDidNotFinalizeError("Boucle terminée sans résultat")

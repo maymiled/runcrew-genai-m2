@@ -166,10 +166,22 @@ async def run_agent_stream(crew_id: str, brief: str, jwt: str):
 
 async def run_agent(crew_id: str, brief: str, jwt: str) -> dict:
     """Non-streaming wrapper around run_agent_stream, for callers that only want
-    the final draft (e.g. /coach/plan without debug mode). Behaviour unchanged."""
+    the final draft (e.g. /coach/plan without debug mode). Behaviour unchanged.
+
+    Drains the generator to completion instead of `return`ing/`raise`ing from
+    inside the `async for` -- exiting early leaves it suspended mid `async with`
+    (stdio_client/ClientSession), and its eventual aclose() runs in the wrong
+    anyio cancel scope, crashing the *next* call. See agent/chat.py's run_chat
+    for the same fix, found first there."""
+    result = None
+    error = None
     async for event in run_agent_stream(crew_id, brief, jwt):
         if event["type"] == "final":
-            return event["result"]
-        if event["type"] == "error":
-            raise AgentDidNotFinalizeError(event["message"])
+            result = event["result"]
+        elif event["type"] == "error":
+            error = event["message"]
+    if error:
+        raise AgentDidNotFinalizeError(error)
+    if result is not None:
+        return result
     raise AgentDidNotFinalizeError("Boucle terminée sans résultat")

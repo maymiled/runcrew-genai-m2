@@ -13,12 +13,13 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import TraceDebug from '../../../src/components/TraceDebug';
 import { COULEURS, ESPACEMENT, RAYONS } from '../../../src/lib/constantes';
 import { supabase } from '../../../src/lib/supabase';
 import { useAuthStore } from '../../../src/stores/useAuthStore';
 import { useChatStore } from '../../../src/stores/useChatStore';
 import { router } from 'expo-router';
-import { questionnerKipper } from '../../../src/lib/coach';
+import { EvenementDebug, questionnerKipper, questionnerKipperDebug } from '../../../src/lib/coach';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -94,6 +95,8 @@ export default function ChatCrew() {
   const [chargement, setChargement] = useState(true);
   const [envoi, setEnvoi] = useState(false);
   const [kipperEnCours, setKipperEnCours] = useState(false);
+  const [modeDebug, setModeDebug] = useState(false);
+  const [evenementsDebug, setEvenementsDebug] = useState<EvenementDebug[]>([]);
 
   const profilsCache = useRef<Map<string, string>>(new Map());
   const flatListRef = useRef<FlatList>(null);
@@ -217,6 +220,7 @@ export default function ChatCrew() {
       const question = contenu.replace(/^@kipper\s*/i, '').trim();
       if (!question) return;
       setKipperEnCours(true);
+      setEvenementsDebug([]);
 
       const ajouterMsgKipper = (texte: string) => {
         const msg: Message = {
@@ -235,7 +239,11 @@ export default function ChatCrew() {
         const { data: { session: authSess } } = await supabase.auth.getSession();
         const jwt = authSess?.access_token;
         if (!jwt) throw new Error('Session expirée');
-        const reponse = await questionnerKipper(crewId, question, userId, jwt);
+        const reponse = modeDebug
+          ? await questionnerKipperDebug(crewId, question, userId, jwt, (nouveaux) =>
+              setEvenementsDebug((prev) => [...prev, ...nouveaux]),
+            )
+          : await questionnerKipper(crewId, question, userId, jwt);
         ajouterMsgKipper(reponse);
       } catch {
         ajouterMsgKipper('Je suis temporairement indisponible. Réessaie dans quelques instants.');
@@ -285,6 +293,17 @@ export default function ChatCrew() {
         <Text style={styles.headerNom} numberOfLines={1}>
           {nomCrew || 'Chargement…'}
         </Text>
+        <TouchableOpacity
+          onPress={() => setModeDebug((v) => !v)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={[styles.debugBtn, modeDebug && styles.debugBtnActif]}
+        >
+          <Ionicons
+            name="bug"
+            size={18}
+            color={modeDebug ? COULEURS.legend[500] : COULEURS.night[300]}
+          />
+        </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView
@@ -319,10 +338,14 @@ export default function ChatCrew() {
                 </View>
                 <View style={styles.msgCorps}>
                   <Text style={styles.msgNomKipper}>Kipper</Text>
-                  <View style={styles.bulleKipperTyping}>
-                    <ActivityIndicator size="small" color={COULEURS.legend[400]} />
-                    <Text style={styles.kipperTypingTexte}>Kipper réfléchit…</Text>
-                  </View>
+                  {modeDebug ? (
+                    <TraceDebug evenements={evenementsDebug} enCours={kipperEnCours} />
+                  ) : (
+                    <View style={styles.bulleKipperTyping}>
+                      <ActivityIndicator size="small" color={COULEURS.legend[400]} />
+                      <Text style={styles.kipperTypingTexte}>Kipper réfléchit…</Text>
+                    </View>
+                  )}
                 </View>
               </View>
             ) : null}
@@ -452,6 +475,8 @@ const styles = StyleSheet.create({
     borderBottomColor: COULEURS.night[100],
   },
   retourBtn: { padding: 2 },
+  debugBtn: { padding: 6, borderRadius: RAYONS.full },
+  debugBtnActif: { backgroundColor: COULEURS.legend[50] },
   headerAvatar: {
     width: 36,
     height: 36,

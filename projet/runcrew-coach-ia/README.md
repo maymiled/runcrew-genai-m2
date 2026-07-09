@@ -46,6 +46,22 @@ MOCK_COACH=1 python app.py
 - `POST /coach/plan` — headers `Authorization: Bearer <jwt capitaine>`, body `{crew_id, brief}` → `{draft}`
 - `POST /coach/publish` — headers `Authorization: Bearer <jwt capitaine>`, body `{crew_id, cree_par, draft}` → `{session_id}`
 
+## Déploiement (Render)
+
+Un `render.yaml` à la racine du repo décrit un "Blueprint" Render pour ce service.
+
+1. Créer un compte sur [render.com](https://render.com) (gratuit, connexion via GitHub).
+2. **New → Blueprint**, sélectionner ce repo — Render lit `render.yaml` et configure tout seul
+   (build : `pip install -r requirements.txt && python -m rag.build_index` ; start : `gunicorn ... app:app`).
+3. Renseigner dans le dashboard Render les 3 variables marquées `sync: false` dans `render.yaml` :
+   `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` (jamais dans le code, jamais committées).
+4. Une fois déployé, Render donne une URL du type `https://runcrew-coach-ia.onrender.com`.
+5. Côté app mobile : mettre `EXPO_PUBLIC_COACH_API_URL=https://runcrew-coach-ia.onrender.com` dans
+   `projet/app/.env` (voir `src/lib/coach.ts`).
+
+**Limite du tier gratuit** : le service "dort" après 15 min d'inactivité et prend ~30s à se réveiller au
+prochain appel — ouvrir l'URL quelques minutes avant la démo pour la "réchauffer".
+
 ## Test rapide en ligne de commande
 
 ```bash

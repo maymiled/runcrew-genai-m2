@@ -1,41 +1,57 @@
-# RunCrew — GenAI M2 Hackathon
+# RunCrew — app mobile
 
-Application mobile de coaching pour clubs de running, construite avec React Native / Expo et un agent IA basé sur Claude Haiku.
+App mobile RunCrew (React Native + Expo + Supabase) : les run clubs ("crews")
+organisent leurs séances, et un agent IA (**Kipper**) aide le capitaine à :
 
-## Architecture
+- **générer un plan de séance** personnalisé à partir d'un brief en langage naturel
+  (écran Coach IA) ;
+- **discuter avec le crew** en langage naturel sur ses séances/performances
+  (`questionnerKipper` → `/coach/chat`) ;
+- **analyser une séance passée** (progression des coureurs, ajustements de groupes
+  suggérés — `analyserSeance` → `/coach/analyse`).
 
-```
-runcrew/          ← App mobile (React Native + Expo + Supabase)
-runcrew-coach-backend/  ← Agent coach (Flask + Claude Haiku + MCP + RAG)
-notebooks/        ← TDs complétés (TD1 → TD5)
-projet/           ← Sujet hackathon
-```
+Le backend correspondant vit dans [`../runcrew-coach-ia/`](../runcrew-coach-ia/).
 
 ## Stack technique
 
-- **Frontend** : React Native, Expo SDK 54, TypeScript, Expo Router v5, Zustand
-- **Backend** : Supabase (PostgreSQL, Auth, Realtime, Storage)
-- **Agent** : Claude Haiku 4.5, MCP (FastMCP), RAG (ChromaDB + sentence-transformers)
-- **Modèle** : `claude-haiku-4-5`
+- React Native, Expo SDK 54, TypeScript, Expo Router v5
+- Zustand (state), `@tanstack/react-query` (cache serveur)
+- Supabase (`@supabase/supabase-js`) — Auth, PostgreSQL, Realtime
 
-## Agent Kipper — Coach IA
-
-L'agent génère des plans de séance personnalisés en :
-1. Fetchant les allures réelles du crew via MCP (`get_membres_allures`)
-2. Recherchant les connaissances coaching via RAG (`search_coaching_knowledge`)
-3. Adaptant le plan à la météo (`get_meteo_prevision`)
-4. Validant la contrainte de durée par itération (boucle `reason → act → observe`)
-
-## Lancer le projet
+## Setup
 
 ```bash
-# App mobile
-cd runcrew && npx expo start --tunnel
-
-# Backend agent
-cd runcrew-coach-backend && python app.py
+npm install
 ```
 
-## Variables d'environnement
+Identifiants Supabase (URL + clé **anon**, publique par design — protégée par les
+Row Level Security policies) en dur dans `src/lib/constantes.ts`, pas de `.env`
+requis pour ça. Aucune clé API (Anthropic) n'est utilisée côté mobile — l'agent
+tourne uniquement côté backend.
 
-Voir `.env.example` à la racine.
+Pour pointer vers le backend Coach IA déployé plutôt que sur `localhost`, copier
+`.env.example` en `.env` et renseigner `EXPO_PUBLIC_COACH_API_URL` (voir
+[`../README.md`](../README.md) pour le déploiement Render du backend).
+
+## Lancer
+
+```bash
+npx expo start
+```
+
+Le backend Coach IA doit tourner en parallèle (local ou déployé) pour que les
+écrans Coach/Chat/Analyse fonctionnent — voir
+[`../runcrew-coach-ia/README.md`](../runcrew-coach-ia/README.md). Son URL est
+configurée dans `src/lib/coach.ts` (par défaut `http://localhost:5050` si aucune
+URL déployée n'est renseignée).
+
+## Structure
+
+```
+app/                  ← écrans (Expo Router) : auth, crew, session, chat, coach IA...
+src/
+├── lib/              ← client Supabase, constantes design, client du backend coach
+├── stores/           ← Zustand (auth, crew, session, chat, coach)
+├── hooks/
+└── types/
+```

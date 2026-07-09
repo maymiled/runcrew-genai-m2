@@ -12,7 +12,7 @@ FINALIZE_TOOL_SCHEMA = {
             "titre": {"type": "string"},
             "type_entrainement": {
                 "type": "string",
-                "enum": ["fractionne", "seuil", "tempo", "footing", "sortie_longue", "libre"],
+                "enum": ["fractionne", "seuil", "endurance_footing", "sortie_longue", "recup", "cote", "libre"],
             },
             "heure_rdv": {
                 "type": "string",

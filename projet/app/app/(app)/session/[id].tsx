@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Linking,
+  Modal,
   Platform,
   ScrollView,
   Share,
@@ -22,7 +23,7 @@ import { annulerRappelSession, planifierRappelSession } from '../../../src/lib/n
 import { supabase } from '../../../src/lib/supabase';
 import { useAuthStore } from '../../../src/stores/useAuthStore';
 import { TypeEntrainement, StatutConfirmation } from '../../../src/types/base';
-import { Session, GroupeAllure, EtapeDeroulement } from '../../../src/types/session';
+import { Session, GroupeAllure, EtapeDeroulement, BilanSeance } from '../../../src/types/session';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -128,6 +129,14 @@ export default function PageSession() {
   const [groupesOuvert, setGroupesOuvert] = useState(true);
   const [participantsOuvert, setParticipantsOuvert] = useState(true);
 
+  // Bilan de séance
+  const [bilanExistant, setBilanExistant] = useState<BilanSeance | null>(null);
+  const [bilanMin, setBilanMin] = useState(5);
+  const [bilanSec, setBilanSec] = useState(30);
+  const [bilanRessenti, setBilanRessenti] = useState<number | null>(null);
+  const [bilanCommentaire, setBilanCommentaire] = useState('');
+  const [soumissionBilan, setSoumissionBilan] = useState(false);
+
   const userId = authSession?.user?.id;
 
   useEffect(() => {
@@ -138,7 +147,7 @@ export default function PageSession() {
   async function chargerTout() {
     setChargement(true);
 
-    const [{ data: sess }, { data: grp }, { data: conf }, { data: parts }] = await Promise.all([
+    const [{ data: sess }, { data: grp }, { data: conf }, { data: parts }, { data: bilan }] = await Promise.all([
       supabase.from('sessions').select('*').eq('id', id).single(),
       supabase.from('groupes_allure').select('*').eq('session_id', id).order('ordre'),
       userId
@@ -155,12 +164,21 @@ export default function PageSession() {
         .eq('session_id', id)
         .eq('statut', 'present')
         .order('cree_le'),
+      userId
+        ? supabase
+            .from('allures_reelles')
+            .select('*')
+            .eq('session_id', id)
+            .eq('utilisateur_id', userId)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
 
     if (sess) setSessionData(sess as Session);
     if (grp) setGroupes(grp as GroupeAllure[]);
     if (conf) setConfirmation(conf as ConfirmationLocale);
     if (parts) setParticipants(parts as Participant[]);
+    if (bilan) setBilanExistant(bilan as BilanSeance);
 
     setChargement(false);
   }
@@ -226,6 +244,31 @@ export default function PageSession() {
     }
   }
 
+  async function soumettreMonBilan() {
+    const allureDecimal = parseFloat(`${bilanMin}.${bilanSec.toString().padStart(2, '0')}`);
+    setSoumissionBilan(true);
+    try {
+      const { data, error } = await supabase
+        .from('allures_reelles')
+        .insert({
+          session_id: id,
+          utilisateur_id: userId,
+          allure_reelle: allureDecimal,
+          ressenti: bilanRessenti,
+          commentaire: bilanCommentaire.trim() || null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      setBilanExistant(data as BilanSeance);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e: any) {
+      Alert.alert('Erreur', e.message || "Impossible d'enregistrer le bilan.");
+    } finally {
+      setSoumissionBilan(false);
+    }
+  }
+
   async function validerSeance() {
     if (!id || chargementValidation) return;
     setChargementValidation(true);
@@ -273,8 +316,11 @@ export default function PageSession() {
   const estCreateur = sessionData.cree_par === authSession?.user?.id;
   const estValidee = !!sessionData.validee;
   const estPassee = new Date(sessionData.heure_rdv) < new Date();
+  const bilanEnAttente = estValidee && estPresent && !bilanExistant;
+  const phaseActive = extrairePhaseActive(sessionData);
 
   return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
@@ -313,6 +359,7 @@ export default function PageSession() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contenu}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Hero */}
         <View style={[styles.hero, { backgroundColor: couleurType }]}>
@@ -525,6 +572,26 @@ export default function PageSession() {
           )}
         </View>
 
+        {/* Bilan de séance — formulaire ou récap */}
+        {(bilanEnAttente || bilanExistant) && (
+          <SectionBilan
+            bilanExistant={bilanExistant}
+            bilanEnAttente={bilanEnAttente}
+            groupes={groupes}
+            phaseActive={phaseActive}
+            bilanMin={bilanMin}
+            bilanSec={bilanSec}
+            bilanRessenti={bilanRessenti}
+            bilanCommentaire={bilanCommentaire}
+            onChangeMin={setBilanMin}
+            onChangeSec={setBilanSec}
+            onChangeRessenti={setBilanRessenti}
+            onChangeCommentaire={setBilanCommentaire}
+            onSoumettre={soumettreMonBilan}
+            soumission={soumissionBilan}
+          />
+        )}
+
         {/* Validation séance (créateur uniquement, session passée non encore validée) */}
         {estCreateur && !estValidee && estPassee && (
           <View style={styles.validationBloc}>
@@ -598,6 +665,7 @@ export default function PageSession() {
         </View>
       )}
     </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -703,6 +771,585 @@ function CarteGroupeAllure({ groupe, couleur }: { groupe: GroupeAllure; couleur:
     </View>
   );
 }
+
+// ─── Picker allure (copie exacte de creer.tsx) ───────────────────────────────
+
+const ITEM_H = 44;
+const ALLURE_MIN_ITEMS = Array.from({ length: 10 }, (_, i) => String(i + 1));
+const ALLURE_SEC_ITEMS = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+const SEP_W = 36;
+
+type PickerColDef = {
+  items: string[];
+  selectedIndex: number;
+  onSelect: (i: number) => void;
+  separator?: string;
+  label?: string;
+};
+
+function ScrollPickerCol({ items, selectedIndex, onSelect }: { items: string[]; selectedIndex: number; onSelect: (i: number) => void }) {
+  const ref = useRef<ScrollView>(null);
+  const isMomentum = useRef(false);
+  const [localSel, setLocalSel] = useState(selectedIndex);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      ref.current?.scrollTo({ y: selectedIndex * ITEM_H, animated: false });
+    }, 80);
+    return () => clearTimeout(t);
+  }, []);
+
+  function selectIndex(idx: number) {
+    const c = Math.max(0, Math.min(idx, items.length - 1));
+    setLocalSel(c);
+    onSelect(c);
+  }
+  function handlePress(index: number) {
+    setLocalSel(index);
+    ref.current?.scrollTo({ y: index * ITEM_H, animated: true });
+    onSelect(index);
+  }
+  function handleScroll(e: any) {
+    setLocalSel(Math.max(0, Math.min(Math.round(e.nativeEvent.contentOffset.y / ITEM_H), items.length - 1)));
+  }
+  function handleScrollEndDrag(e: any) {
+    if (!isMomentum.current) selectIndex(Math.round(e.nativeEvent.contentOffset.y / ITEM_H));
+  }
+  function handleMomentumScrollBegin() { isMomentum.current = true; }
+  function handleMomentumScrollEnd(e: any) {
+    isMomentum.current = false;
+    selectIndex(Math.round(e.nativeEvent.contentOffset.y / ITEM_H));
+  }
+
+  return (
+    <View style={{ width: 72, height: ITEM_H * 5 }}>
+      <ScrollView
+        ref={ref}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingVertical: ITEM_H * 2 }}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={ITEM_H}
+        decelerationRate="fast"
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        onScrollEndDrag={handleScrollEndDrag}
+        onMomentumScrollBegin={handleMomentumScrollBegin}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
+      >
+        {items.map((item, index) => (
+          <TouchableOpacity
+            key={index}
+            style={[pickerItemStyles.item, index === localSel && pickerItemStyles.itemSelected]}
+            onPress={() => handlePress(index)}
+            activeOpacity={0.8}
+          >
+            <Text style={[pickerItemStyles.itemText, index === localSel && pickerItemStyles.itemTextSelected]}>
+              {item}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      <View pointerEvents="none" style={pickerItemStyles.indicator} />
+    </View>
+  );
+}
+
+const pickerItemStyles = StyleSheet.create({
+  item: { height: ITEM_H, width: 72, alignItems: 'center', justifyContent: 'center' },
+  itemSelected: { backgroundColor: COULEURS.legend[50], borderRadius: 8 },
+  itemText: { fontSize: 22, color: COULEURS.night[300], fontWeight: '500' },
+  itemTextSelected: { color: COULEURS.night[700], fontWeight: '700' },
+  indicator: {
+    position: 'absolute',
+    top: ITEM_H * 2, left: 4, right: 4, height: ITEM_H,
+    borderTopWidth: 1.5, borderBottomWidth: 1.5,
+    borderColor: COULEURS.legend[300], borderRadius: 8,
+  },
+});
+
+function PickerModal({ visible, titre, colonnes, onFermer }: {
+  visible: boolean;
+  titre: string;
+  colonnes: PickerColDef[];
+  onFermer: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
+      <TouchableOpacity style={pStyles.overlay} activeOpacity={1} onPress={onFermer}>
+        <TouchableOpacity activeOpacity={1} style={pStyles.sheet}>
+          <View style={pStyles.handle} />
+          <Text style={pStyles.titre}>{titre}</Text>
+          <View style={pStyles.pickersRow}>
+            {colonnes.map((col, i) => (
+              <View key={i} style={pStyles.colSlot}>
+                <Text style={pStyles.colLabel}>{col.label ?? ''}</Text>
+                {col.separator && <View style={{ width: SEP_W }} />}
+              </View>
+            ))}
+          </View>
+          <View style={pStyles.pickersRow}>
+            {colonnes.map((col, i) => (
+              <View key={i} style={pStyles.colSlot}>
+                <ScrollPickerCol items={col.items} selectedIndex={col.selectedIndex} onSelect={col.onSelect} />
+                {col.separator && <Text style={pStyles.separator}>{col.separator}</Text>}
+              </View>
+            ))}
+          </View>
+          <TouchableOpacity style={pStyles.confirmerBtn} onPress={onFermer}>
+            <Text style={pStyles.confirmerTexte}>Confirmer</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+const pStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: ESPACEMENT.lg, paddingBottom: 36 },
+  handle: { width: 40, height: 4, backgroundColor: COULEURS.night[200], borderRadius: 2, alignSelf: 'center', marginBottom: ESPACEMENT.md },
+  titre: { fontSize: 17, fontWeight: '700', color: COULEURS.night[700], textAlign: 'center', marginBottom: ESPACEMENT.lg },
+  pickersRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  colSlot: { flexDirection: 'row', alignItems: 'center' },
+  colLabel: { width: 72, fontSize: 11, fontWeight: '600', color: COULEURS.night[400], letterSpacing: 0.5, textAlign: 'center' },
+  separator: { width: SEP_W, fontSize: 28, fontWeight: '700', color: COULEURS.night[400], textAlign: 'center' },
+  confirmerBtn: { marginTop: ESPACEMENT.xl, backgroundColor: COULEURS.legend[500], borderRadius: RAYONS.full, paddingVertical: 14, alignItems: 'center' },
+  confirmerTexte: { color: '#fff', fontSize: 15, fontWeight: '700' },
+});
+
+// ─── Helpers bilan ───────────────────────────────────────────────────────────
+
+function decimalToSecondes(d: number): number {
+  const str = d.toFixed(2);
+  const [minStr, secStr] = str.split('.');
+  return parseInt(minStr) * 60 + parseInt(secStr.padEnd(2, '0'));
+}
+
+// Les allures workout sont en "vraies minutes décimales" (4.5 = 4:30/km).
+// Les allures groupes/bilan sont en "pseudo-décimal" (4.30 = 4:30/km).
+// Cette fonction convertit workout → pseudo-décimal pour la comparaison.
+function minutesDecimalVersPseudo(val: number): number {
+  const min = Math.floor(val);
+  const sec = Math.round((val - min) * 60);
+  return parseFloat(`${min}.${sec.toString().padStart(2, '0')}`);
+}
+
+type PhaseActifInfo = {
+  label: string;
+  cibleBasse: number | null;  // pseudo-décimal (5.30 = 5:30/km)
+  cibleHaute: number | null;
+  repetitions: number | null;
+};
+
+function extrairePhaseActive(session: Session): PhaseActifInfo | null {
+  const d = session.deroulement;
+  if (!d || Array.isArray(d)) return null;
+  if ((d as any).format !== 'workout_v2') return null;
+
+  const blocs: any[] = (d as any).blocs ?? [];
+  const typesEffort = ['actif', 'seuil', 'tempo'];
+
+  for (const bloc of blocs) {
+    if (bloc.kind === 'etape' && typesEffort.includes(bloc.typeEtape)) {
+      const labelMap: Record<string, string> = { actif: 'Actif', seuil: 'Seuil', tempo: 'Tempo' };
+      return {
+        label: labelMap[bloc.typeEtape] ?? 'Effort',
+        cibleBasse: bloc.allureBasse ? minutesDecimalVersPseudo(bloc.allureBasse) : null,
+        cibleHaute: bloc.alureHaute  ? minutesDecimalVersPseudo(bloc.alureHaute)  : null,
+        repetitions: 1,
+      };
+    }
+    if (bloc.kind === 'boucle') {
+      for (const etape of bloc.etapes) {
+        if (typesEffort.includes(etape.typeEtape)) {
+          const labelMap: Record<string, string> = { actif: 'Actif', seuil: 'Seuil', tempo: 'Tempo' };
+          return {
+            label: `${labelMap[etape.typeEtape] ?? 'Effort'} · ${bloc.repetitions}×`,
+            cibleBasse: etape.allureBasse ? minutesDecimalVersPseudo(etape.allureBasse) : null,
+            cibleHaute: etape.alureHaute  ? minutesDecimalVersPseudo(etape.alureHaute)  : null,
+            repetitions: bloc.repetitions,
+          };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+const RESSENTI_CONFIG = [
+  { label: 'Très\nfacile', couleur: COULEURS.succes },
+  { label: 'Facile', couleur: COULEURS.info },
+  { label: 'Modéré', couleur: COULEURS.legend[400] },
+  { label: 'Difficile', couleur: COULEURS.avertissement },
+  { label: 'Maximal', couleur: COULEURS.danger },
+];
+
+function SectionBilan({
+  bilanExistant,
+  bilanEnAttente,
+  groupes,
+  phaseActive,
+  bilanMin,
+  bilanSec,
+  bilanRessenti,
+  bilanCommentaire,
+  onChangeMin,
+  onChangeSec,
+  onChangeRessenti,
+  onChangeCommentaire,
+  onSoumettre,
+  soumission,
+}: {
+  bilanExistant: BilanSeance | null;
+  bilanEnAttente: boolean;
+  groupes: GroupeAllure[];
+  phaseActive: PhaseActifInfo | null;
+  bilanMin: number;
+  bilanSec: number;
+  bilanRessenti: number | null;
+  bilanCommentaire: string;
+  onChangeMin: (v: number) => void;
+  onChangeSec: (v: number) => void;
+  onChangeRessenti: (v: number) => void;
+  onChangeCommentaire: (v: string) => void;
+  onSoumettre: () => void;
+  soumission: boolean;
+}) {
+  const [pickerVisible, setPickerVisible] = useState(false);
+
+  // Priorité : phase active extraite du workout > plage des groupes d'allure
+  const cibleBasse = phaseActive?.cibleBasse ?? (groupes.length > 0 ? Math.min(...groupes.map(g => g.allure_basse)) : null);
+  const cibleHaute = phaseActive?.cibleHaute ?? (groupes.length > 0 ? Math.max(...groupes.map(g => g.allure_haute)) : null);
+  const cibleLabel = phaseActive?.label ?? 'Allure cible';
+
+  if (bilanExistant) {
+    // Affichage récap
+    const actualSec = decimalToSecondes(bilanExistant.allure_reelle);
+    let statutZone: 'dans' | 'avance' | 'retard' | null = null;
+    let deltaSec = 0;
+    if (cibleBasse !== null && cibleHaute !== null) {
+      const basseSec = decimalToSecondes(cibleBasse);
+      const hauteSec = decimalToSecondes(cibleHaute);
+      if (actualSec < basseSec) { statutZone = 'avance'; deltaSec = basseSec - actualSec; }
+      else if (actualSec <= hauteSec) { statutZone = 'dans'; }
+      else { statutZone = 'retard'; deltaSec = actualSec - hauteSec; }
+    }
+    const deltaMin = Math.floor(deltaSec / 60);
+    const deltaSecRest = deltaSec % 60;
+    const deltaStr = `${deltaMin > 0 ? `${deltaMin}min ` : ''}${deltaSecRest}s`;
+    const ressentiConfig = bilanExistant.ressenti ? RESSENTI_CONFIG[bilanExistant.ressenti - 1] : null;
+
+    return (
+      <View style={[stylesB.bloc, { borderColor: COULEURS.legend[100] }]}>
+        <View style={stylesB.header}>
+          <View style={stylesB.headerIcone}>
+            <Ionicons name="checkmark-circle" size={16} color={COULEURS.legend[500]} />
+          </View>
+          <Text style={stylesB.headerTitre}>Mon bilan</Text>
+        </View>
+
+        {/* Comparaison allures */}
+        <View style={stylesB.comparaisonContainer}>
+          <View style={stylesB.comparaisonBlocsRow}>
+            {cibleBasse !== null && cibleHaute !== null ? (
+              <View style={stylesB.comparaisonBloc}>
+                <Text style={stylesB.comparaisonLabel}>{cibleLabel.toUpperCase()}</Text>
+                <Text style={stylesB.comparaisonValeur}>
+                  {decimalVersAllure(cibleBasse)}–{decimalVersAllure(cibleHaute)}
+                </Text>
+                <Text style={stylesB.comparaisonSous}>/km</Text>
+              </View>
+            ) : null}
+            {cibleBasse !== null && (
+              <View style={stylesB.comparaisonFleche}>
+                <Ionicons name="arrow-forward" size={16} color={COULEURS.night[300]} />
+              </View>
+            )}
+            <View style={[stylesB.comparaisonBloc, stylesB.comparaisonBlocActuel]}>
+              <Text style={stylesB.comparaisonLabel}>MON ALLURE</Text>
+              <Text style={[stylesB.comparaisonValeur, { color: COULEURS.legend[500] }]}>
+                {decimalVersAllure(bilanExistant.allure_reelle)}
+              </Text>
+              <Text style={stylesB.comparaisonSous}>/km</Text>
+            </View>
+          </View>
+          {statutZone !== null && (
+            <View style={[
+              stylesB.statutBadge,
+              { backgroundColor: statutZone === 'dans' ? COULEURS.succes + '18' : statutZone === 'avance' ? COULEURS.legend[100] : COULEURS.avertissement + '18' }
+            ]}>
+              <Ionicons
+                name={statutZone === 'dans' ? 'checkmark-circle' : statutZone === 'avance' ? 'trending-up' : 'trending-down'}
+                size={14}
+                color={statutZone === 'dans' ? COULEURS.succes : statutZone === 'avance' ? COULEURS.legend[500] : '#D97706'}
+              />
+              <Text style={[stylesB.statutTexte, {
+                color: statutZone === 'dans' ? COULEURS.succes : statutZone === 'avance' ? COULEURS.legend[500] : '#D97706'
+              }]}>
+                {statutZone === 'dans' ? 'Dans la zone' : statutZone === 'avance' ? `En avance · ${deltaStr}` : `En retrait · ${deltaStr}`}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Ressenti */}
+        {ressentiConfig && (
+          <View style={stylesB.ressentiRow}>
+            <View style={[stylesB.ressentiPuceActive, { backgroundColor: ressentiConfig.couleur + '20' }]}>
+              <View style={[stylesB.ressentiDot, { backgroundColor: ressentiConfig.couleur }]} />
+              <Text style={[stylesB.ressentiActiveLabel, { color: ressentiConfig.couleur }]}>
+                {ressentiConfig.label.replace('\n', ' ')}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Commentaire */}
+        {bilanExistant.commentaire ? (
+          <Text style={stylesB.commentaireTexte}>"{bilanExistant.commentaire}"</Text>
+        ) : null}
+      </View>
+    );
+  }
+
+  // Formulaire
+  return (
+    <View style={[stylesB.bloc, { borderColor: COULEURS.avertissement + '40' }]}>
+      <View style={stylesB.header}>
+        <View style={[stylesB.headerIcone, { backgroundColor: COULEURS.avertissement + '18' }]}>
+          <Ionicons name="create-outline" size={16} color={COULEURS.avertissement} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={stylesB.headerTitre}>Mon bilan de séance</Text>
+          <Text style={stylesB.headerSous}>
+            {phaseActive
+              ? `Ton allure en phase ${phaseActive.label} uniquement — pas l'échauffement ni la récupération.`
+              : 'Ton allure moyenne de séance pour que le coach adapte la suite.'}
+          </Text>
+        </View>
+      </View>
+
+      {/* Allure réelle — picker scroll */}
+      <View style={stylesB.champGroupe}>
+        <Text style={stylesB.champLabel}>
+          {phaseActive ? `Allure en phase ${phaseActive.label}` : 'Allure réelle'}
+        </Text>
+        <TouchableOpacity style={stylesB.allurePickerBtn} onPress={() => setPickerVisible(true)} activeOpacity={0.8}>
+          <Text style={stylesB.allurePickerValeur}>
+            {bilanMin}:{String(bilanSec).padStart(2, '0')}
+          </Text>
+          <Text style={stylesB.allurePickerUnite}>/km</Text>
+          <Ionicons name="chevron-down" size={16} color={COULEURS.legend[500]} />
+        </TouchableOpacity>
+        {cibleBasse !== null && cibleHaute !== null && (
+          <Text style={stylesB.cibleHint}>
+            Cible {cibleLabel.toLowerCase()} : {decimalVersAllure(cibleBasse)} – {decimalVersAllure(cibleHaute)} /km
+          </Text>
+        )}
+        <PickerModal
+          visible={pickerVisible}
+          titre={phaseActive ? `Allure — ${phaseActive.label}` : 'Allure réelle'}
+          onFermer={() => setPickerVisible(false)}
+          colonnes={[
+            {
+              items: ALLURE_MIN_ITEMS,
+              selectedIndex: bilanMin - 1,
+              onSelect: v => onChangeMin(v + 1),
+              separator: ':',
+            },
+            {
+              items: ALLURE_SEC_ITEMS,
+              selectedIndex: bilanSec,
+              onSelect: v => onChangeSec(v),
+              label: '/km',
+            },
+          ]}
+        />
+      </View>
+
+      {/* Ressenti RPE */}
+      <View style={stylesB.champGroupe}>
+        <Text style={stylesB.champLabel}>Ressenti</Text>
+        <View style={stylesB.ressentiPicker}>
+          {RESSENTI_CONFIG.map((r, i) => {
+            const niveau = i + 1;
+            const actif = bilanRessenti === niveau;
+            return (
+              <TouchableOpacity
+                key={niveau}
+                style={[
+                  stylesB.ressentiBtn,
+                  actif && { backgroundColor: r.couleur, borderColor: r.couleur }
+                ]}
+                onPress={() => onChangeRessenti(niveau)}
+                activeOpacity={0.7}
+              >
+                <Text style={[stylesB.ressentiBtnChiffre, actif && { color: '#fff' }]}>{niveau}</Text>
+                <Text style={[stylesB.ressentiBtnLabel, actif && { color: 'rgba(255,255,255,0.85)' }]} numberOfLines={2}>{r.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Commentaire */}
+      <View style={stylesB.champGroupe}>
+        <Text style={stylesB.champLabel}>Commentaire <Text style={{ color: COULEURS.night[300] }}>(optionnel)</Text></Text>
+        <TextInput
+          style={stylesB.commentaireInput}
+          value={bilanCommentaire}
+          onChangeText={onChangeCommentaire}
+          placeholder="Super séance, j'ai bien tenu l'allure..."
+          placeholderTextColor={COULEURS.night[300]}
+          multiline
+          numberOfLines={3}
+          textAlignVertical="top"
+        />
+      </View>
+
+      <TouchableOpacity
+        style={[stylesB.boutonSoumettre, soumission && { opacity: 0.7 }]}
+        onPress={onSoumettre}
+        disabled={soumission}
+        activeOpacity={0.85}
+      >
+        {soumission ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <>
+            <Ionicons name="save-outline" size={18} color="#fff" />
+            <Text style={stylesB.boutonSoumettreTexte}>Enregistrer mon bilan</Text>
+          </>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const stylesB = StyleSheet.create({
+  bloc: {
+    marginHorizontal: ESPACEMENT.md,
+    marginTop: ESPACEMENT.lg,
+    backgroundColor: '#fff',
+    borderRadius: RAYONS.xl,
+    borderWidth: 1.5,
+    padding: ESPACEMENT.md,
+    gap: ESPACEMENT.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  headerIcone: {
+    width: 32,
+    height: 32,
+    borderRadius: RAYONS.full,
+    backgroundColor: COULEURS.legend[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitre: { fontSize: 16, fontWeight: '700', color: COULEURS.night[700], marginTop: 2 },
+  headerSous: { fontSize: 12, color: COULEURS.night[400], lineHeight: 16, marginTop: 2 },
+
+  // Comparaison
+  comparaisonContainer: { gap: ESPACEMENT.sm },
+  comparaisonBlocsRow: { flexDirection: 'row', alignItems: 'center', gap: ESPACEMENT.sm },
+  comparaisonBloc: { flex: 1, alignItems: 'center', gap: 2 },
+  comparaisonBlocActuel: {
+    backgroundColor: COULEURS.legend[50],
+    borderRadius: RAYONS.lg,
+    paddingVertical: ESPACEMENT.sm,
+    paddingHorizontal: ESPACEMENT.sm,
+  },
+  comparaisonLabel: { fontSize: 9, fontWeight: '700', color: COULEURS.night[300], letterSpacing: 0.8, textTransform: 'uppercase' },
+  comparaisonValeur: { fontSize: 22, fontWeight: '800', color: COULEURS.night[700], letterSpacing: -0.5 },
+  comparaisonSous: { fontSize: 11, color: COULEURS.night[400], fontWeight: '500' },
+  comparaisonFleche: { justifyContent: 'center', paddingHorizontal: 4 },
+  statutBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: RAYONS.lg,
+    paddingVertical: 8,
+    paddingHorizontal: ESPACEMENT.sm,
+  },
+  statutTexte: { fontSize: 13, fontWeight: '600' },
+
+  // Ressenti récap
+  ressentiRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  ressentiPuceActive: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: RAYONS.full,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  ressentiDot: { width: 8, height: 8, borderRadius: RAYONS.full },
+  ressentiActiveLabel: { fontSize: 13, fontWeight: '600' },
+  commentaireTexte: { fontSize: 14, color: COULEURS.night[500], fontStyle: 'italic', lineHeight: 20 },
+
+  // Formulaire
+  champGroupe: { gap: 8 },
+  champLabel: { fontSize: 13, fontWeight: '600', color: COULEURS.night[500] },
+  allurePickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ESPACEMENT.sm,
+    backgroundColor: COULEURS.legend[50],
+    borderWidth: 1.5,
+    borderColor: COULEURS.legend[200],
+    borderRadius: RAYONS.lg,
+    paddingHorizontal: ESPACEMENT.md,
+    paddingVertical: 12,
+  },
+  allurePickerValeur: { fontSize: 28, fontWeight: '800', color: COULEURS.night[700], letterSpacing: -0.5 },
+  allurePickerUnite: { fontSize: 14, color: COULEURS.night[400], fontWeight: '500', flex: 1 },
+  cibleHint: { fontSize: 12, color: COULEURS.night[300], fontStyle: 'italic' },
+  ressentiPicker: { flexDirection: 'row', gap: 6 },
+  ressentiBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: RAYONS.md,
+    borderWidth: 1.5,
+    borderColor: COULEURS.night[200],
+    backgroundColor: COULEURS.night[50],
+    gap: 4,
+  },
+  ressentiBtnChiffre: { fontSize: 16, fontWeight: '800', color: COULEURS.night[600] },
+  ressentiBtnLabel: { fontSize: 9, fontWeight: '600', color: COULEURS.night[400], textAlign: 'center', lineHeight: 11 },
+  commentaireInput: {
+    borderWidth: 1.5,
+    borderColor: COULEURS.night[200],
+    borderRadius: RAYONS.md,
+    paddingHorizontal: ESPACEMENT.sm,
+    paddingVertical: ESPACEMENT.sm,
+    fontSize: 14,
+    color: COULEURS.night[700],
+    backgroundColor: COULEURS.night[50],
+    minHeight: 80,
+  },
+  boutonSoumettre: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: COULEURS.legend[500],
+    borderRadius: RAYONS.full,
+    paddingVertical: 14,
+    marginTop: ESPACEMENT.xs,
+    shadowColor: COULEURS.legend[500],
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  boutonSoumettreTexte: { fontSize: 15, fontWeight: '700', color: '#fff' },
+});
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 

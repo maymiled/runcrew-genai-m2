@@ -27,6 +27,17 @@ import { Profil } from '../../../src/types/profil';
 
 type SessionAvecCrew = Session & { crews: { nom: string } };
 type MembreAvecCrew = { crew_id: string; crews: Crew };
+type BilanEnAttente = {
+  session_id: string;
+  sessions: {
+    id: string;
+    titre: string;
+    type_entrainement: TypeEntrainement;
+    heure_rdv: string;
+    crew_id: string;
+    crews: { nom: string };
+  };
+};
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -84,6 +95,7 @@ export default function Accueil() {
   >({});
   const [nbRunsValides, setNbRunsValides] = useState(0);
   const [totalKmValides, setTotalKmValides] = useState(0);
+  const [bilansEnAttente, setBilansEnAttente] = useState<BilanEnAttente[]>([]);
   const [chargement, setChargement] = useState(true);
   const [rafraichissement, setRafraichissement] = useState(false);
   const [chargementBtn, setChargementBtn] = useState(false);
@@ -99,20 +111,36 @@ export default function Accueil() {
     setChargement(true);
     const userId = authSession!.user.id;
 
-    const [{ data: profilData }, { data: membresData }, { data: runsData }] = await Promise.all([
+    const [{ data: profilData }, { data: membresData }, { data: sessionsValidees }] = await Promise.all([
       supabase.from('profils').select('*').eq('id', userId).single(),
       supabase.from('membres').select('crew_id, crews(*)').eq('utilisateur_id', userId),
       supabase
         .from('confirmations')
-        .select('session_id, sessions!inner(validee, distance_km)')
+        .select('session_id, sessions!inner(id, titre, type_entrainement, heure_rdv, crew_id, validee, distance_km, crews!inner(nom))')
         .eq('utilisateur_id', userId)
         .eq('statut', 'present')
         .eq('sessions.validee', true),
     ]);
 
-    setNbRunsValides(runsData?.length ?? 0);
-    const totalKmReel = (runsData ?? []).reduce((acc: number, r: any) => acc + (r.sessions?.distance_km ?? 0), 0);
+    setNbRunsValides(sessionsValidees?.length ?? 0);
+    const totalKmReel = (sessionsValidees ?? []).reduce((acc: number, r: any) => acc + (r.sessions?.distance_km ?? 0), 0);
     setTotalKmValides(Math.round(totalKmReel));
+
+    // Bilans en attente : sessions validées sans bilan soumis
+    const sessionIdsValides = (sessionsValidees ?? []).map((c: any) => c.session_id);
+    if (sessionIdsValides.length > 0) {
+      const { data: bilansExistants } = await supabase
+        .from('allures_reelles')
+        .select('session_id')
+        .eq('utilisateur_id', userId)
+        .in('session_id', sessionIdsValides);
+      const bilanSoumisIds = new Set((bilansExistants ?? []).map((b: any) => b.session_id));
+      setBilansEnAttente(
+        (sessionsValidees ?? []).filter((c: any) => !bilanSoumisIds.has(c.session_id)) as unknown as BilanEnAttente[]
+      );
+    } else {
+      setBilansEnAttente([]);
+    }
 
     if (profilData) setProfil(profilData as Profil);
     // Le store est la source de vérité pour le nom — pas besoin de re-fetch si déjà chargé
@@ -287,6 +315,25 @@ export default function Accueil() {
               <Ionicons name="enter-outline" size={18} color={COULEURS.legend[500]} />
               <Text style={styles.boutonRejoindreTexte}>Rejoindre avec un code</Text>
             </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Bilans en attente */}
+        {bilansEnAttente.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.bilanSectionHeader}>
+              <View style={styles.bilanSectionIcone}>
+                <Ionicons name="pencil" size={14} color={COULEURS.avertissement} />
+              </View>
+              <Text style={styles.bilanSectionTitre}>
+                {bilansEnAttente.length === 1 ? 'Bilan en attente' : `${bilansEnAttente.length} bilans en attente`}
+              </Text>
+            </View>
+            <View style={styles.bilanContainer}>
+              {bilansEnAttente.map((b) => (
+                <CarteBilanEnAttente key={b.session_id} bilan={b} />
+              ))}
+            </View>
           </View>
         )}
 
@@ -497,6 +544,31 @@ function PetiteCarteSession({
       {estPresent && (
         <Ionicons name="checkmark-circle" size={20} color={COULEURS.legend[400]} />
       )}
+      <Ionicons name="chevron-forward" size={18} color={COULEURS.night[300]} />
+    </TouchableOpacity>
+  );
+}
+
+// ─── Carte bilan en attente ───────────────────────────────────────────────────
+
+function CarteBilanEnAttente({ bilan }: { bilan: BilanEnAttente }) {
+  const couleur = COULEURS_TYPE[bilan.sessions.type_entrainement];
+  return (
+    <TouchableOpacity
+      style={styles.carteBilan}
+      onPress={() => router.push(`/session/${bilan.sessions.id}` as any)}
+      activeOpacity={0.8}
+    >
+      <View style={[styles.carteBilanAccent, { backgroundColor: couleur }]} />
+      <View style={styles.carteBilanCorps}>
+        <Text style={styles.carteBilanTitre} numberOfLines={1}>{bilan.sessions.titre}</Text>
+        <Text style={styles.carteBilanMeta}>
+          {bilan.sessions.crews.nom} · {formaterDateCourte(bilan.sessions.heure_rdv)}
+        </Text>
+      </View>
+      <View style={[styles.carteBilanBadge, { backgroundColor: COULEURS.avertissement + '20' }]}>
+        <Text style={[styles.carteBilanBadgeTexte, { color: '#D97706' }]}>À renseigner</Text>
+      </View>
       <Ionicons name="chevron-forward" size={18} color={COULEURS.night[300]} />
     </TouchableOpacity>
   );
@@ -715,6 +787,53 @@ const styles = StyleSheet.create({
   },
   ctaBtnTexte: { fontSize: 16, fontWeight: '800', color: COULEURS.night[700] },
   ctaBtnTextePresent: { color: COULEURS.legend[500] },
+
+  // Section bilans en attente
+  bilanSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ESPACEMENT.sm,
+    marginBottom: ESPACEMENT.sm,
+  },
+  bilanSectionIcone: {
+    width: 24,
+    height: 24,
+    borderRadius: RAYONS.full,
+    backgroundColor: COULEURS.avertissement + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bilanSectionTitre: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COULEURS.night[700],
+  },
+  bilanContainer: {
+    backgroundColor: COULEURS.avertissement + '0D',
+    borderRadius: RAYONS.xl,
+    borderWidth: 1,
+    borderColor: COULEURS.avertissement + '30',
+    paddingHorizontal: ESPACEMENT.md,
+    overflow: 'hidden',
+  },
+  carteBilan: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ESPACEMENT.sm,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COULEURS.avertissement + '20',
+  },
+  carteBilanAccent: { width: 4, height: 38, borderRadius: RAYONS.full },
+  carteBilanCorps: { flex: 1 },
+  carteBilanTitre: { fontSize: 15, fontWeight: '600', color: COULEURS.night[700] },
+  carteBilanMeta: { fontSize: 13, color: COULEURS.night[400], marginTop: 2 },
+  carteBilanBadge: {
+    borderRadius: RAYONS.full,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  carteBilanBadgeTexte: { fontSize: 11, fontWeight: '700' },
 
   // Petite carte session
   petiteCarte: {

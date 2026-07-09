@@ -1,50 +1,41 @@
-# Welcome to your Expo app 👋
+# RunCrew — GenAI M2 Hackathon
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Application mobile de coaching pour clubs de running, construite avec React Native / Expo et un agent IA basé sur Claude Haiku.
 
-## Get started
+## Architecture
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+runcrew/          ← App mobile (React Native + Expo + Supabase)
+runcrew-coach-backend/  ← Agent coach (Flask + Claude Haiku + MCP + RAG)
+notebooks/        ← TDs complétés (TD1 → TD5)
+projet/           ← Sujet hackathon
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Stack technique
 
-## Learn more
+- **Frontend** : React Native, Expo SDK 54, TypeScript, Expo Router v5, Zustand
+- **Backend** : Supabase (PostgreSQL, Auth, Realtime, Storage)
+- **Agent** : Claude Haiku 4.5, MCP (FastMCP), RAG (ChromaDB + sentence-transformers)
+- **Modèle** : `claude-haiku-4-5`
 
-To learn more about developing your project with Expo, look at the following resources:
+## Agent Kipper — Coach IA
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+L'agent génère des plans de séance personnalisés en :
+1. Fetchant les allures réelles du crew via MCP (`get_membres_allures`)
+2. Recherchant les connaissances coaching via RAG (`search_coaching_knowledge`)
+3. Adaptant le plan à la météo (`get_meteo_prevision`)
+4. Validant la contrainte de durée par itération (boucle `reason → act → observe`)
 
-## Join the community
+## Lancer le projet
 
-Join our community of developers creating universal apps.
+```bash
+# App mobile
+cd runcrew && npx expo start --tunnel
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+# Backend agent
+cd runcrew-coach-backend && python app.py
+```
+
+## Variables d'environnement
+
+Voir `.env.example` à la racine.

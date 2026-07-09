@@ -44,3 +44,13 @@ export type Confirmation = {
   cree_le: string;
   modifie_le: string;
 };
+
+export type BilanSeance = {
+  id: string;
+  session_id: string;
+  utilisateur_id: string;
+  allure_reelle: number;
+  ressenti: number | null;
+  commentaire: string | null;
+  cree_le: string;
+};

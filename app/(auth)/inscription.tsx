@@ -27,8 +27,8 @@ export default function Inscription() {
       return;
     }
 
-    if (motDePasse.length < 6) {
-      Alert.alert('Erreur', 'Le mot de passe doit faire au moins 6 caractères');
+    if (motDePasse.length < 8) {
+      Alert.alert('Erreur', 'Le mot de passe doit faire au moins 8 caractères');
       return;
     }
 
@@ -92,7 +92,7 @@ export default function Inscription() {
               style={styles.champ}
               value={motDePasse}
               onChangeText={setMotDePasse}
-              placeholder="6 caractères minimum"
+              placeholder="8 caractères minimum"
               placeholderTextColor={COULEURS.night[300]}
               secureTextEntry
             />

@@ -12,6 +12,7 @@ export type Crew = {
   capitaine_id: string;
   code_invitation: string;
   max_membres: number;
+  photo_url: string | null;
   cree_le: string;
   modifie_le: string;
 };

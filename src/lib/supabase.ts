@@ -7,19 +7,19 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const WebStorageAdapter = {
   getItem: (key: string) => {
     if (typeof window !== 'undefined') {
-      return Promise.resolve(window.localStorage.getItem(key));
+      return Promise.resolve(window.sessionStorage.getItem(key));
     }
     return Promise.resolve(null);
   },
   setItem: (key: string, value: string) => {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(key, value);
+      window.sessionStorage.setItem(key, value);
     }
     return Promise.resolve();
   },
   removeItem: (key: string) => {
     if (typeof window !== 'undefined') {
-      window.localStorage.removeItem(key);
+      window.sessionStorage.removeItem(key);
     }
     return Promise.resolve();
   },

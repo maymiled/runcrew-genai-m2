@@ -11,18 +11,25 @@ type AuthStore = {
   seDeconnecter: () => Promise<void>;
 };
 
+// Guard contre les souscriptions multiples (hot reload, double-mount StrictMode)
+let _subscription: { unsubscribe: () => void } | null = null;
+
 export const useAuthStore = create<AuthStore>((set) => ({
   session: null,
   charge: true,
 
   initialiser: () => {
+    if (_subscription) return;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       set({ session, charge: false });
     });
 
-    supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       set({ session });
     });
+
+    _subscription = subscription;
   },
 
   seConnecter: async (email, mdp) => {

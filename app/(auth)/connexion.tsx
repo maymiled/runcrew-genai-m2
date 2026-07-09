@@ -12,6 +12,7 @@ import {
     View,
 } from 'react-native';
 import { COULEURS } from '../../src/lib/constantes';
+import { supabase } from '../../src/lib/supabase';
 import { useAuthStore } from '../../src/stores/useAuthStore';
 
 export default function Connexion() {
@@ -33,6 +34,26 @@ export default function Connexion() {
       Alert.alert('Erreur de connexion', error.message || 'Une erreur est survenue');
     } finally {
       setChargement(false);
+    }
+  };
+
+  const reinitialiserMotDePasse = async () => {
+    if (!email) {
+      Alert.alert('Email requis', 'Entre ton adresse email d\'abord.');
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: 'runcrew://reset-password',
+    });
+    if (error) {
+      const msg = error.message.includes('rate limit')
+        ? 'Trop de demandes. Attends quelques minutes avant de réessayer.'
+        : error.message.includes('not found') || error.message.includes('user')
+        ? 'Aucun compte trouvé avec cet email.'
+        : 'Impossible d\'envoyer l\'email. Réessaie dans quelques instants.';
+      Alert.alert('Erreur', msg);
+    } else {
+      Alert.alert('Email envoyé', `Un lien de réinitialisation a été envoyé à ${email.trim().toLowerCase()}.`);
     }
   };
 
@@ -86,6 +107,13 @@ export default function Connexion() {
             ) : (
               <Text style={styles.boutonTexte}>Se connecter</Text>
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.motDePasseOublie}
+            onPress={reinitialiserMotDePasse}
+          >
+            <Text style={styles.motDePasseOublieTexte}>Mot de passe oublié ?</Text>
           </TouchableOpacity>
 
           <View style={styles.footer}>
@@ -171,6 +199,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  motDePasseOublie: {
+    alignItems: 'center',
+    marginTop: 12,
+    paddingVertical: 4,
+  },
+  motDePasseOublieTexte: {
+    fontSize: 14,
+    color: COULEURS.legend[500],
+    fontWeight: '500',
   },
   footer: {
     flexDirection: 'row',

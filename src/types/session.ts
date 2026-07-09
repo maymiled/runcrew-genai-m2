@@ -18,8 +18,9 @@ export type Session = {
   duree_entrainement_min: number | null;
   distance_km: number | null;
   point_rdv: string | null;
-  deroulement: EtapeDeroulement[] | null;
+  deroulement: EtapeDeroulement[] | { format: 'workout_v2'; blocs: any[] } | null;
   nb_presents: number;
+  validee?: boolean;
   cree_le: string;
   modifie_le: string;
 };
@@ -42,4 +43,14 @@ export type Confirmation = {
   statut: StatutConfirmation;
   cree_le: string;
   modifie_le: string;
+};
+
+export type BilanSeance = {
+  id: string;
+  session_id: string;
+  utilisateur_id: string;
+  allure_reelle: number;
+  ressenti: number | null;
+  commentaire: string | null;
+  cree_le: string;
 };

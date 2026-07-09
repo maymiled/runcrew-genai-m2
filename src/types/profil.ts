@@ -10,7 +10,10 @@ export type Profil = {
   total_sorties: number;
   total_km: number;
   plan: PlanAbonnement;
+  photo_url: string | null;
   strava_id: string | null;
+  pseudo_modifie_le: string | null;
+  expo_push_token: string | null;
   cree_le: string;
   modifie_le: string;
 };

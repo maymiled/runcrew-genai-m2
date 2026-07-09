@@ -1,41 +1,38 @@
-# RunCrew — GenAI M2 Hackathon
+# RunCrew — Generative AI M2 (Dauphine) — Groupe Mayy / Giuliano
 
-Application mobile de coaching pour clubs de running, construite avec React Native / Expo et un agent IA basé sur Claude Haiku.
-
-## Architecture
+Repo de groupe pour le module Generative AI (M2 IASD, 2026). Contient les deux
+livrables du cours :
 
 ```
-runcrew/          ← App mobile (React Native + Expo + Supabase)
-runcrew-coach-backend/  ← Agent coach (Flask + Claude Haiku + MCP + RAG)
-notebooks/        ← TDs complétés (TD1 → TD5)
-projet/           ← Sujet hackathon
+notebooks/    ← les 5 TD du cours (TD1 embeddings → TD5 agent), complétés
+projet/       ← le projet hackathon (Track 1) — voir projet/README.md
 ```
 
-## Stack technique
+## Notebooks (TD1 → TD5)
 
-- **Frontend** : React Native, Expo SDK 54, TypeScript, Expo Router v5, Zustand
-- **Backend** : Supabase (PostgreSQL, Auth, Realtime, Storage)
-- **Agent** : Claude Haiku 4.5, MCP (FastMCP), RAG (ChromaDB + sentence-transformers)
-- **Modèle** : `claude-haiku-4-5`
-
-## Agent Kipper — Coach IA
-
-L'agent génère des plans de séance personnalisés en :
-1. Fetchant les allures réelles du crew via MCP (`get_membres_allures`)
-2. Recherchant les connaissances coaching via RAG (`search_coaching_knowledge`)
-3. Adaptant le plan à la météo (`get_meteo_prevision`)
-4. Validant la contrainte de durée par itération (boucle `reason → act → observe`)
-
-## Lancer le projet
+Labs du cours : embeddings, classification, RAG, MCP, agent — chaque TD inclut son
+mini-projet (`mini_project/`) quand applicable (TD3, TD4, TD5).
 
 ```bash
-# App mobile
-cd runcrew && npx expo start --tunnel
-
-# Backend agent
-cd runcrew-coach-backend && python app.py
+cd notebooks
+pip install -r requirements.txt
+cp ../.env.example ../.env   # à la racine du repo — renseigner ANTHROPIC_API_KEY
+jupyter notebook getting_started.ipynb   # vérifie que le setup fonctionne
 ```
 
-## Variables d'environnement
+Les notebooks utilisent `python-dotenv`, qui recherche le `.env` en remontant les
+dossiers parents — le mettre à la racine du repo suffit pour tous les TD.
 
-Voir `.env.example` à la racine.
+## Projet hackathon — RunCrew Coach IA
+
+Voir [`projet/README.md`](projet/README.md) pour l'architecture (app mobile +
+backend agent) et les instructions de lancement.
+
+## Statut
+
+- [x] TD1 – Embeddings
+- [x] TD2 – Classification
+- [x] TD3 – RAG (+ mini-projet)
+- [x] TD4 – MCP (+ mini-projet)
+- [x] TD5 – Agent (+ mini-projet)
+- [x] Projet hackathon — Coach IA (voir `projet/README.md` pour le détail)

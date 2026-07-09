@@ -74,12 +74,12 @@ async def run_chat(
                     if block.type != "tool_use":
                         continue
                     if block.name == "finaliser_reponse_chat":
-                        reponse = block.input.get("reponse", "")
+                        reponse = block.input.get("reponse") or ""
                         finalize_id = block.id
                         continue
                     try:
                         out = await session.call_tool(block.name, block.input)
-                        text = "\n".join(c.text for c in out.content)
+                        text = "\n".join(c.text for c in out.content) or "(aucun résultat)"
                         tool_results.append(
                             {"type": "tool_result", "tool_use_id": block.id, "content": text}
                         )
@@ -93,12 +93,24 @@ async def run_chat(
                             }
                         )
 
-                if reponse is not None:
+                if finalize_id is not None:
+                    if not reponse:
+                        reponse = "Désolé, je n'ai pas pu formuler de réponse."
                     tool_results.append(
                         {"type": "tool_result", "tool_use_id": finalize_id, "content": "OK"}
                     )
                     messages.append({"role": "user", "content": tool_results})
                     return reponse
+
+                if not tool_results:
+                    for block in resp.content:
+                        if block.type == "tool_use":
+                            tool_results.append({
+                                "type": "tool_result",
+                                "tool_use_id": block.id,
+                                "content": "Erreur: résultat manquant.",
+                                "is_error": True,
+                            })
 
                 messages.append({"role": "user", "content": tool_results})
 

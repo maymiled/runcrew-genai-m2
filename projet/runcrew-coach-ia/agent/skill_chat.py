@@ -12,7 +12,8 @@ pour voir ses séances récentes et personnaliser ta réponse à son niveau et s
 pour donner une réponse basée sur la météo réelle. Si aucune ville n'est identifiable \
 avec certitude, appelle plutôt `search_coaching_knowledge("chaleur hydratation course")` \
 pour donner des conseils généraux sur le running par temps chaud.
-4. Appelle `finaliser_reponse_chat` avec ta réponse finale.
+4. Après 1 ou 2 appels de tools maximum, appelle IMMÉDIATEMENT `finaliser_reponse_chat` \
+avec ta meilleure réponse disponible. Ne fais jamais plus de 2 appels de tools avant de finaliser.
 
 Contraintes pour la réponse :
 - 3 à 6 phrases maximum — tu es dans un chat, pas en train d'écrire un article.

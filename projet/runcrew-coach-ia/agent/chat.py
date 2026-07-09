@@ -138,9 +138,15 @@ async def run_chat_stream(
 async def run_chat(crew_id: str, question: str, utilisateur_id: str | None, jwt: str) -> str:
     """Non-streaming wrapper around run_chat_stream. Behaviour unchanged for
     existing callers (/coach/chat without debug mode)."""
+    result = None
+    error = None
     async for event in run_chat_stream(crew_id, question, utilisateur_id, jwt):
         if event["type"] == "final":
-            return event["result"]
-        if event["type"] == "error":
-            raise AgentDidNotFinalizeError(event["message"])
+            result = event["result"]
+        elif event["type"] == "error":
+            error = event["message"]
+    if error:
+        raise AgentDidNotFinalizeError(error)
+    if result is not None:
+        return result
     raise AgentDidNotFinalizeError("Boucle terminée sans résultat")

@@ -2,8 +2,11 @@ from mcp.server.fastmcp import FastMCP
 
 from mcp_server.rag import search as rag_search
 from mcp_server.supabase_client import (
+    fetch_bilans_seance,
+    fetch_historique_runner,
     fetch_membres_with_profils,
     parse_numrange,
+    poster_message,
     secondes_vers_allure_decimale,
 )
 from mcp_server.weather import get_weather
@@ -58,6 +61,33 @@ def get_meteo_prevision(ville: str, date_iso: str) -> dict:
     (e.g. from the captain's brief) — use it to adjust intensity/safety advice for
     hot, cold, or rainy conditions. Skip it if no city is known."""
     return get_weather(ville, date_iso)
+
+
+@mcp_server.tool()
+def get_bilans_seance(session_id: str) -> dict:
+    """Fetch all post-session bilans for a given session_id. Returns session info,
+    target pace groups (groupes_cible), and each runner's actual pace (allure_reelle,
+    ressenti 1-5, commentaire). Paces use the packed MM.SS decimal convention
+    (5.30 = 5min30s/km). Call this first in the post-session analysis flow."""
+    return fetch_bilans_seance(session_id)
+
+
+@mcp_server.tool()
+def get_historique_runner(utilisateur_id: str, limit: int = 4) -> list:
+    """Fetch the last N bilans submitted by a specific runner across all sessions.
+    Returns each bilan with session title, type, date, actual pace, RPE and comment.
+    Use this on every runner who submitted a bilan (from get_bilans_seance) to detect
+    progress trends, stagnation, or overtraining patterns."""
+    return fetch_historique_runner(utilisateur_id, limit)
+
+
+@mcp_server.tool()
+def poster_message_chat(crew_id: str, contenu: str) -> dict:
+    """Post a message in the crew chat as the authenticated user (captain).
+    Call this BEFORE finaliser_analyse_seance to share the collective recap with
+    the crew. Keep the message concise (≤150 words), motivating, with emojis,
+    and written in French (tutoiement)."""
+    return poster_message(crew_id, contenu)
 
 
 if __name__ == "__main__":

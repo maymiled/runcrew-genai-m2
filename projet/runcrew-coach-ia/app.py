@@ -8,6 +8,7 @@ load_dotenv()
 from flask import Flask, jsonify, request  # noqa: E402
 from flask_cors import CORS  # noqa: E402
 
+from agent.analyse import run_analyse  # noqa: E402
 from agent.loop import AgentDidNotFinalizeError, run_agent  # noqa: E402
 from publish.supabase_write import insert_groupes, insert_session  # noqa: E402
 
@@ -90,6 +91,35 @@ def coach_publish():
         return jsonify(error="supabase_error", detail=str(e)), 502
 
     return jsonify(session_id=session["id"]), 200
+
+
+@app.route("/coach/analyse", methods=["POST"])
+def coach_analyse():
+    jwt = extract_bearer(request.headers.get("Authorization"))
+    if not jwt:
+        return jsonify(error="missing_token"), 401
+
+    body = request.get_json(silent=True) or {}
+    session_id = body.get("session_id")
+    crew_id = body.get("crew_id")
+    if not session_id or not crew_id:
+        return jsonify(
+            error="invalid_request",
+            message="session_id and crew_id are required",
+        ), 400
+
+    try:
+        analyse = asyncio.run(run_analyse(session_id, crew_id, jwt))
+    except AgentDidNotFinalizeError:
+        return jsonify(
+            error="agent_no_finalize",
+            message="L'agent n'a pas pu finaliser l'analyse. Réessaie.",
+        ), 502
+    except Exception:
+        app.logger.exception("coach_analyse failed")
+        return jsonify(error="internal_error"), 500
+
+    return jsonify(analyse=analyse), 200
 
 
 if __name__ == "__main__":

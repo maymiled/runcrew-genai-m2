@@ -24,6 +24,7 @@ import { supabase } from '../../../src/lib/supabase';
 import { useAuthStore } from '../../../src/stores/useAuthStore';
 import { TypeEntrainement, StatutConfirmation } from '../../../src/types/base';
 import { Session, GroupeAllure, EtapeDeroulement, BilanSeance } from '../../../src/types/session';
+import { analyserSeance, AnalyseResultat } from '../../../src/lib/coach';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -131,6 +132,10 @@ export default function PageSession() {
 
   // Bilan de séance
   const [bilanExistant, setBilanExistant] = useState<BilanSeance | null>(null);
+  // Analyse collective (capitaine)
+  const [analyseEnCours, setAnalyseEnCours] = useState(false);
+  const [analyseResultat, setAnalyseResultat] = useState<AnalyseResultat | null>(null);
+  const [analyseEtape, setAnalyseEtape] = useState(0);
   const [bilanMin, setBilanMin] = useState(5);
   const [bilanSec, setBilanSec] = useState(30);
   const [bilanRessenti, setBilanRessenti] = useState<number | null>(null);
@@ -266,6 +271,26 @@ export default function PageSession() {
       Alert.alert('Erreur', e.message || "Impossible d'enregistrer le bilan.");
     } finally {
       setSoumissionBilan(false);
+    }
+  }
+
+  async function lancerAnalyse() {
+    if (!sessionData || analyseEnCours) return;
+    setAnalyseEnCours(true);
+    setAnalyseEtape(0);
+    const intervalId = setInterval(() => setAnalyseEtape(e => (e + 1) % 3), 2200);
+    try {
+      const { data: { session: authSess } } = await supabase.auth.getSession();
+      const jwt = authSess?.access_token;
+      if (!jwt) throw new Error('Session expirée — reconnecte-toi.');
+      const result = await analyserSeance(id!, sessionData.crew_id, jwt);
+      setAnalyseResultat(result);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e: any) {
+      Alert.alert('Analyse impossible', e.message || "Le serveur Kipper n'est pas joignable.");
+    } finally {
+      clearInterval(intervalId);
+      setAnalyseEnCours(false);
     }
   }
 
@@ -630,6 +655,54 @@ export default function PageSession() {
               )}
             </TouchableOpacity>
           </View>
+        )}
+
+        {/* Analyse collective — capitaine, séance validée */}
+        {estCreateur && estValidee && (
+          analyseResultat ? (
+            <SectionAnalyse
+              analyse={analyseResultat}
+              crewId={sessionData.crew_id}
+            />
+          ) : (
+            <View style={stylesKipper.bloc}>
+              <View style={stylesKipper.header}>
+                <View style={stylesKipper.iconeWrap}>
+                  <Ionicons name="analytics-outline" size={18} color={COULEURS.legend[500]} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={stylesKipper.titre}>Analyse collective</Text>
+                  <Text style={stylesKipper.sous}>
+                    Kipper analyse les bilans, détecte les patterns et poste un récap dans le chat.
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={[stylesKipper.bouton, analyseEnCours && { opacity: 0.75 }]}
+                onPress={lancerAnalyse}
+                disabled={analyseEnCours}
+                activeOpacity={0.85}
+              >
+                {analyseEnCours ? (
+                  <View style={stylesKipper.boutonEnCours}>
+                    <ActivityIndicator color="#fff" size="small" />
+                    <Text style={stylesKipper.boutonTexte}>
+                      {[
+                        'Kipper récupère les bilans…',
+                        'Kipper analyse les performances…',
+                        'Kipper rédige le récap…',
+                      ][analyseEtape]}
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <Ionicons name="sparkles" size={18} color="#fff" />
+                    <Text style={stylesKipper.boutonTexte}>Analyser la séance</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          )
         )}
 
         {/* Espace pour le bouton fixe */}
@@ -1349,6 +1422,257 @@ const stylesB = StyleSheet.create({
     elevation: 3,
   },
   boutonSoumettreTexte: { fontSize: 15, fontWeight: '700', color: '#fff' },
+});
+
+// ─── Analyse collective (Kipper) ─────────────────────────────────────────────
+
+const STATUT_CONFIG: Record<string, { label: string; couleur: string; icone: keyof typeof Ionicons.glyphMap }> = {
+  progresse:    { label: 'En progression',  couleur: COULEURS.succes,       icone: 'trending-up' },
+  bon:          { label: 'Dans la zone',     couleur: COULEURS.legend[500],  icone: 'checkmark-circle' },
+  stagne:       { label: 'Stagnation',       couleur: COULEURS.avertissement,icone: 'alert-circle' },
+  surintensité: { label: 'Surintensité',     couleur: COULEURS.danger,       icone: 'flame' },
+  sous_intensite:{ label: 'Sous-intensité', couleur: COULEURS.info,          icone: 'trending-down' },
+};
+
+function SectionAnalyse({
+  analyse,
+  crewId,
+}: {
+  analyse: AnalyseResultat;
+  crewId: string;
+}) {
+  return (
+    <View style={stylesA.bloc}>
+      {/* Header */}
+      <View style={stylesA.header}>
+        <View style={stylesA.headerIcone}>
+          <Ionicons name="analytics" size={16} color={COULEURS.legend[500]} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={stylesA.headerTitre}>Analyse Kipper</Text>
+          <Text style={stylesA.headerSous}>Récap collectif · posté dans le chat</Text>
+        </View>
+        <View style={stylesA.kipperBadge}>
+          <Text style={stylesA.kipperBadgeTexte}>IA</Text>
+        </View>
+      </View>
+
+      {/* Synthèse */}
+      <View style={stylesA.syntheseBloc}>
+        <Text style={stylesA.syntheseTexte}>{analyse.synthese}</Text>
+      </View>
+
+      {/* Insights runners */}
+      {analyse.insights_runners.length > 0 && (
+        <View style={stylesA.section}>
+          <Text style={stylesA.sectionTitre}>Performances individuelles</Text>
+          <View style={stylesA.insightsList}>
+            {analyse.insights_runners.map((insight, i) => {
+              const cfg = STATUT_CONFIG[insight.statut] ?? STATUT_CONFIG.bon;
+              const coulAvatar = teintAvatar(insight.utilisateur_id);
+              return (
+                <View key={i} style={stylesA.insightCard}>
+                  <View style={stylesA.insightHeader}>
+                    <View style={[stylesA.insightAvatar, { backgroundColor: coulAvatar + '20' }]}>
+                      <Text style={[stylesA.insightInitiales, { color: coulAvatar }]}>
+                        {initialesAvatar(insight.nom)}
+                      </Text>
+                    </View>
+                    <Text style={stylesA.insightNom} numberOfLines={1}>{insight.nom}</Text>
+                    <View style={[stylesA.statutBadge, { backgroundColor: cfg.couleur + '18' }]}>
+                      <Ionicons name={cfg.icone} size={11} color={cfg.couleur} />
+                      <Text style={[stylesA.statutLabel, { color: cfg.couleur }]}>{cfg.label}</Text>
+                    </View>
+                  </View>
+                  <Text style={stylesA.insightCommentaire}>{insight.commentaire}</Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {/* Ajustements groupes */}
+      {analyse.ajustements_groupes.length > 0 && (
+        <View style={stylesA.section}>
+          <Text style={stylesA.sectionTitre}>Suggestions pour la prochaine séance</Text>
+          {analyse.ajustements_groupes.map((adj, i) => (
+            <View key={i} style={stylesA.ajustCard}>
+              <View style={stylesA.ajustHeader}>
+                <Ionicons name="git-branch-outline" size={13} color={COULEURS.legend[400]} />
+                <Text style={stylesA.ajustNom}>{adj.runner_nom}</Text>
+              </View>
+              <Text style={stylesA.ajustSuggestion}>{adj.suggestion}</Text>
+              <Text style={stylesA.ajustRaison}>{adj.raison}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* CTA chat */}
+      <TouchableOpacity
+        style={stylesA.chatBtn}
+        onPress={() => router.push(`/chat/${crewId}` as any)}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="chatbubbles-outline" size={15} color={COULEURS.legend[500]} />
+        <Text style={stylesA.chatBtnTexte}>Voir le récap dans le chat</Text>
+        <Ionicons name="arrow-forward" size={13} color={COULEURS.legend[400]} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const stylesA = StyleSheet.create({
+  bloc: {
+    marginHorizontal: ESPACEMENT.md,
+    marginTop: ESPACEMENT.lg,
+    backgroundColor: '#fff',
+    borderRadius: RAYONS.xl,
+    borderWidth: 1.5,
+    borderColor: COULEURS.legend[100],
+    padding: ESPACEMENT.md,
+    gap: ESPACEMENT.md,
+    shadowColor: COULEURS.legend[500],
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  headerIcone: {
+    width: 34,
+    height: 34,
+    borderRadius: RAYONS.full,
+    backgroundColor: COULEURS.legend[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitre: { fontSize: 15, fontWeight: '700', color: COULEURS.night[700], marginTop: 1 },
+  headerSous: { fontSize: 11, color: COULEURS.night[400], marginTop: 2 },
+  kipperBadge: {
+    backgroundColor: COULEURS.legend[500],
+    borderRadius: RAYONS.full,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    alignSelf: 'flex-start',
+  },
+  kipperBadgeTexte: { fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
+
+  syntheseBloc: {
+    backgroundColor: COULEURS.legend[50],
+    borderRadius: RAYONS.lg,
+    padding: ESPACEMENT.sm,
+  },
+  syntheseTexte: { fontSize: 14, color: COULEURS.night[600], lineHeight: 21, fontStyle: 'italic' },
+
+  section: { gap: 10 },
+  sectionTitre: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COULEURS.night[400],
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+
+  insightsList: { gap: 8 },
+  insightCard: {
+    backgroundColor: COULEURS.night[50],
+    borderRadius: RAYONS.lg,
+    padding: 12,
+    gap: 6,
+  },
+  insightHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  insightAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: RAYONS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  insightInitiales: { fontSize: 11, fontWeight: '700' },
+  insightNom: { flex: 1, fontSize: 14, fontWeight: '600', color: COULEURS.night[700] },
+  statutBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: RAYONS.full,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  statutLabel: { fontSize: 10, fontWeight: '700' },
+  insightCommentaire: { fontSize: 13, color: COULEURS.night[500], lineHeight: 19 },
+
+  ajustCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: COULEURS.legend[300],
+    paddingLeft: 12,
+    gap: 3,
+    paddingVertical: 4,
+  },
+  ajustHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  ajustNom: { fontSize: 13, fontWeight: '700', color: COULEURS.night[700] },
+  ajustSuggestion: { fontSize: 13, color: COULEURS.legend[600], fontWeight: '600' },
+  ajustRaison: { fontSize: 12, color: COULEURS.night[400], lineHeight: 17 },
+
+  chatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: COULEURS.legend[50],
+    borderWidth: 1.5,
+    borderColor: COULEURS.legend[200],
+    borderRadius: RAYONS.full,
+    paddingHorizontal: ESPACEMENT.md,
+    paddingVertical: 11,
+    justifyContent: 'center',
+  },
+  chatBtnTexte: { fontSize: 14, fontWeight: '600', color: COULEURS.legend[500], flex: 1, textAlign: 'center' },
+});
+
+const stylesKipper = StyleSheet.create({
+  bloc: {
+    marginHorizontal: ESPACEMENT.md,
+    marginTop: ESPACEMENT.lg,
+    backgroundColor: '#fff',
+    borderRadius: RAYONS.xl,
+    borderWidth: 1.5,
+    borderColor: COULEURS.legend[100],
+    padding: ESPACEMENT.md,
+    gap: ESPACEMENT.md,
+    shadowColor: COULEURS.legend[500],
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  iconeWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: RAYONS.full,
+    backgroundColor: COULEURS.legend[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  titre: { fontSize: 15, fontWeight: '700', color: COULEURS.night[700], marginTop: 1 },
+  sous: { fontSize: 11, color: COULEURS.night[400], marginTop: 2, lineHeight: 16 },
+  bouton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: COULEURS.legend[500],
+    borderRadius: RAYONS.full,
+    paddingVertical: 14,
+    shadowColor: COULEURS.legend[500],
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  boutonEnCours: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  boutonTexte: { fontSize: 15, fontWeight: '700', color: '#fff' },
 });
 
 // ─── Styles ──────────────────────────────────────────────────────────────────

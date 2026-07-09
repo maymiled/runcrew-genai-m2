@@ -2,7 +2,10 @@ import asyncio
 import os
 import threading
 import time
+import traceback
 import uuid
+
+import anyio
 
 from dotenv import load_dotenv
 
@@ -63,6 +66,8 @@ def _start_run(stream_factory) -> str:
         try:
             asyncio.run(_consume())
         except Exception as e:  # noqa: BLE001
+            tb = traceback.format_exc()
+            app.logger.error("_start_run worker crash:\n%s", tb)
             RUNS[run_id]["error"] = f"internal_error: {e}"
         finally:
             RUNS[run_id]["done"] = True
@@ -135,7 +140,7 @@ def coach_plan():
         return jsonify(draft=MOCK_DRAFT), 200
 
     try:
-        draft = asyncio.run(run_agent(crew_id, brief, jwt))
+        draft = anyio.run(run_agent, crew_id, brief, jwt)
     except AgentDidNotFinalizeError:
         return jsonify(
             error="agent_no_finalize",
@@ -225,7 +230,7 @@ def coach_chat():
         ), 400
 
     try:
-        reponse = asyncio.run(run_chat(crew_id, question, utilisateur_id, jwt))
+        reponse = anyio.run(run_chat, crew_id, question, utilisateur_id, jwt)
     except AgentDidNotFinalizeError:
         return jsonify(
             error="agent_no_finalize",
@@ -281,7 +286,7 @@ def coach_analyse():
         ), 400
 
     try:
-        analyse = asyncio.run(run_analyse(session_id, crew_id, jwt))
+        analyse = anyio.run(run_analyse, session_id, crew_id, jwt)
     except AgentDidNotFinalizeError:
         return jsonify(
             error="agent_no_finalize",
